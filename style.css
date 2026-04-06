@@ -103,3 +103,18 @@ body {
     opacity: 0; transition: opacity 0.3s; pointer-events: none;
 }
 .copy-tooltip.show { opacity: 1; }
+
+/* Bloqueia zoom por toque */
+html {
+    touch-action: manipulation;
+}
+
+* {
+    -ms-touch-action: manipulation;
+    touch-action: manipulation;
+}
+
+/* Evita zoom ao dar double-tap em inputs */
+input, select, textarea {
+    font-size: 16px;
+}
