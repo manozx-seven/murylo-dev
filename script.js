@@ -8,8 +8,22 @@ function copyLink() {
     document.body.removeChild(tempInput);
     
     const msg = document.getElementById("copyMsg");
-    msg.classList.add("show");
-    setTimeout(() => msg.classList.remove("show"), 2000);
+    
+    // Remove e readiciona para sempre funcionar, mesmo clicando várias vezes
+    msg.classList.remove("show");
+    
+    // Pequeno delay para resetar a animação antes de mostrar de novo
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            msg.classList.add("show");
+        });
+    });
+    
+    // Desaparece suavemente após 2 segundos
+    clearTimeout(msg._hideTimeout);
+    msg._hideTimeout = setTimeout(() => {
+        msg.classList.remove("show");
+    }, 2000);
 }
 
 // --- SISTEMA DE BACKGROUND: REDE DE PARTÍCULAS + ESTRELAS ---
@@ -189,18 +203,24 @@ function animate() {
 
 animate();
 
-// Bloqueia zoom por gesto de pinça
+// Bloqueia zoom por pinça em QUALQUER lugar
+document.addEventListener('touchmove', function(e) {
+    if (e.touches.length > 1) {
+        e.preventDefault();
+    }
+}, { passive: false });
+
 document.addEventListener('gesturestart', function(e) {
     e.preventDefault();
-});
+}, { passive: false });
 
 document.addEventListener('gesturechange', function(e) {
     e.preventDefault();
-});
+}, { passive: false });
 
 document.addEventListener('gestureend', function(e) {
     e.preventDefault();
-});
+}, { passive: false });
 
 // Bloqueia double-tap zoom
 let lastTouchEnd = 0;

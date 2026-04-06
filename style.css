@@ -97,12 +97,24 @@ body {
 
 /* Tooltip */
 .copy-tooltip {
-    position: absolute; top: -30px; right: 0;
-    background: #10b981; color: white;
-    font-size: 10px; padding: 4px 8px; border-radius: 4px;
-    opacity: 0; transition: opacity 0.3s; pointer-events: none;
+    position: absolute;
+    top: -30px;
+    right: 0;
+    background: #10b981;
+    color: white;
+    font-size: 10px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    opacity: 0;
+    transform: translateY(5px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+    pointer-events: none;
 }
-.copy-tooltip.show { opacity: 1; }
+
+.copy-tooltip.show {
+    opacity: 1;
+    transform: translateY(0);
+}
 
 /* Bloqueia zoom por toque */
 html {
