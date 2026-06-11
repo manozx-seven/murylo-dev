@@ -40,9 +40,9 @@
         <header class="glass-panel w-full rounded-3xl p-8 mb-6 flex flex-col items-center text-center fade-in relative">
             <div class="w-full flex justify-between items-center mb-6 relative">
                 <!-- Tag Status com vidro escuro -->
-                <div class="flex items-center gap-2 px-3 py-1 bg-white/5 backdrop-blur-md rounded-full border border-white/10 shadow-sm">
+                <div id="bio-status-badge" class="flex items-center gap-2 px-3 py-1 bg-white/5 backdrop-blur-md rounded-full border border-white/10 shadow-sm">
                     <div class="status-dot"></div>
-                    <span class="text-[10px] font-semibold text-slate-300 uppercase tracking-wider">Disponível para projetos</span>
+                    <span id="bio-status-text" class="text-[10px] font-semibold text-slate-300 uppercase tracking-wider">Disponível para projetos</span>
                 </div>
                 <div class="relative">
                     <span id="copyMsg" class="copy-tooltip">Copiado!</span>
@@ -53,19 +53,19 @@
             </div>
 
             <div class="relative mb-5">
-                <img src="murylo.jpg" alt="Murylo Neves" class="w-24 h-24 rounded-full border-4 border-slate-800 object-cover shadow-2xl bg-slate-900">
+                <img id="bio-photo" src="murylo.jpg" alt="Murylo Neves" class="w-24 h-24 rounded-full border-4 border-slate-800 object-cover shadow-2xl bg-slate-900">
             </div>
 
-            <h1 class="text-3xl font-bold tracking-tight mb-1 text-gradient">Murylo Neves</h1>
-            <p class="font-code text-sm text-sky-400 font-medium mb-4 flex items-center gap-2">
+            <h1 id="bio-name" class="text-3xl font-bold tracking-tight mb-1 text-gradient">Murylo Neves</h1>
+            <p id="bio-role" class="font-code text-sm text-sky-400 font-medium mb-4 flex items-center gap-2">
                 &lt;Dev Web/&gt;
             </p>
-            
-            <p class="text-sm text-slate-400 max-w-sm leading-relaxed mb-6">
+
+            <p id="bio-description" class="text-sm text-slate-400 max-w-sm leading-relaxed mb-6">
                 Construindo interfaces limpas, rápidas e escaláveis. Especialista em transformar design em código de alta performance.
             </p>
 
-            <div class="flex flex-wrap justify-center gap-2 font-code text-[11px] text-slate-300">
+            <div id="bio-tags" class="flex flex-wrap justify-center gap-2 font-code text-[11px] text-slate-300">
                 <span class="px-2 py-1 bg-white/5 backdrop-blur-sm rounded-md border border-white/10">Criação de Sites</span>
                 <span class="px-2 py-1 bg-white/5 backdrop-blur-sm rounded-md border border-white/10">Landing Pages</span>
                 <span class="px-2 py-1 bg-white/5 backdrop-blur-sm rounded-md border border-white/10">Sistemas Web</span>
@@ -73,7 +73,7 @@
         </header>
 
         <!-- Links -->
-        <section class="w-full space-y-3 mb-8">
+        <section id="bio-links" class="w-full space-y-3 mb-8">
             <a href="https://site-murylo-dev.netlify.app/" target="_blank" rel="noopener noreferrer" class="link-item glass-panel flex items-center p-3 pr-5 rounded-2xl fade-in delay-1 group">
                 <div class="w-12 h-12 rounded-xl icon-box flex items-center justify-center text-slate-300 mr-4">
                     <i class="fa-solid fa-globe text-xl"></i>
@@ -115,12 +115,15 @@
         <p class="text-[11px] text-slate-500 font-code tracking-wide uppercase mb-3">
             Desenvolvido por <span class="font-bold text-slate-300">Murylo Neves</span>
         </p>
-        <a href="https://instagram.com/murylo.dev" target="_blank" rel="noopener noreferrer" class="glass-panel flex items-center gap-2 text-slate-400 hover:text-pink-500 transition-colors px-4 py-2 rounded-full border border-white/10 shadow-sm text-xs font-semibold group">
-            <i class="fa-brands fa-instagram text-sm group-hover:scale-110 transition-transform"></i>
-            <span>@murylo.dev</span>
-        </a>
+        <div id="bio-social" class="flex flex-wrap gap-2 justify-center">
+            <a href="https://instagram.com/murylo.dev" target="_blank" rel="noopener noreferrer" class="glass-panel flex items-center gap-2 text-slate-400 hover:text-pink-500 transition-colors px-4 py-2 rounded-full border border-white/10 shadow-sm text-xs font-semibold group">
+                <i class="fa-brands fa-instagram text-sm group-hover:scale-110 transition-transform"></i>
+                <span>@murylo.dev</span>
+            </a>
+        </div>
     </footer>
 
     <script src="script.js"></script>
+    <script type="module" src="data-loader.js"></script>
 </body>
 </html>

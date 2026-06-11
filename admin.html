@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — Bio Murylo Neves</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚙️</text></svg>">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════ AUTH -->
+<div id="screen-auth">
+  <div class="auth-card">
+
+    <!-- First-time setup -->
+    <div id="form-setup" class="hidden">
+      <div class="icon-lock"><i class="fa-solid fa-shield-halved"></i></div>
+      <h1>Configuração Inicial</h1>
+      <p>Defina a senha de administrador para este painel.</p>
+      <div class="form-group">
+        <label>Nova Senha</label>
+        <input type="password" id="setup-pass" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label>Confirmar Senha</label>
+        <input type="password" id="setup-confirm" placeholder="Repita a senha" autocomplete="new-password">
+      </div>
+      <p class="error-msg" id="setup-error"></p>
+      <button id="btn-setup" class="btn btn-primary w-full mt-2">Criar Senha</button>
+    </div>
+
+    <!-- Login -->
+    <div id="form-login">
+      <div class="icon-lock"><i class="fa-solid fa-lock"></i></div>
+      <h1>Painel Admin</h1>
+      <p>Acesso restrito — insira sua senha para continuar.</p>
+      <div class="form-group">
+        <label>Senha</label>
+        <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <p class="error-msg" id="login-error"></p>
+      <button id="btn-login" class="btn btn-primary w-full mt-2">Entrar</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ DASHBOARD -->
+<div id="screen-dashboard" class="hidden">
+
+  <!-- Top bar -->
+  <header class="admin-topbar">
+    <div class="brand">
+      <i class="fa-solid fa-sliders"></i>
+      Painel Admin
+    </div>
+    <div class="topbar-actions">
+      <a href="index.html" target="_blank" class="btn btn-secondary">
+        <i class="fa-solid fa-arrow-up-right-from-square"></i> Ver Bio
+      </a>
+      <button id="btn-logout" class="btn btn-danger">
+        <i class="fa-solid fa-right-from-bracket"></i> Sair
+      </button>
+    </div>
+  </header>
+
+  <div class="admin-body">
+
+    <!-- Sidebar -->
+    <nav class="admin-sidebar">
+      <button class="nav-item active" data-section="perfil">
+        <i class="fa-solid fa-user"></i> Perfil
+      </button>
+      <button class="nav-item" data-section="status">
+        <i class="fa-solid fa-circle-dot"></i> Status
+      </button>
+      <button class="nav-item" data-section="links">
+        <i class="fa-solid fa-link"></i> Links
+      </button>
+      <button class="nav-item" data-section="tags">
+        <i class="fa-solid fa-tags"></i> Tags
+      </button>
+      <button class="nav-item" data-section="social">
+        <i class="fa-solid fa-share-nodes"></i> Redes Sociais
+      </button>
+    </nav>
+
+    <!-- Main content -->
+    <main class="admin-main">
+
+      <!-- ── Perfil ── -->
+      <section id="section-perfil" class="admin-section active">
+        <h2>Perfil</h2>
+        <div class="form-group">
+          <label>Nome</label>
+          <input type="text" id="field-name" placeholder="Seu nome completo">
+        </div>
+        <div class="form-group">
+          <label>Função <span style="color:#475569;font-weight:400">(aparece como &lt;Função/&gt;)</span></label>
+          <input type="text" id="field-role" placeholder="Dev Web">
+        </div>
+        <div class="form-group">
+          <label>Descrição</label>
+          <textarea id="field-description" rows="3" placeholder="Descreva o que você faz..."></textarea>
+        </div>
+        <div class="form-group">
+          <label>Foto <span style="color:#475569;font-weight:400">(nome do arquivo ou URL)</span></label>
+          <input type="text" id="field-photo" placeholder="murylo.jpg ou https://...">
+        </div>
+        <button id="btn-save-perfil" class="btn btn-primary">
+          <i class="fa-solid fa-floppy-disk"></i> Salvar Perfil
+        </button>
+      </section>
+
+      <!-- ── Status ── -->
+      <section id="section-status" class="admin-section">
+        <h2>Status</h2>
+        <div class="form-group">
+          <label>Texto do Badge</label>
+          <input type="text" id="field-status-text" placeholder="Disponível para projetos">
+        </div>
+        <div class="form-group toggle-group">
+          <label>Exibir badge de status</label>
+          <label class="toggle">
+            <input type="checkbox" id="field-status-active">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <button id="btn-save-status" class="btn btn-primary">
+          <i class="fa-solid fa-floppy-disk"></i> Salvar Status
+        </button>
+      </section>
+
+      <!-- ── Links ── -->
+      <section id="section-links" class="admin-section">
+        <div class="section-header">
+          <h2>Links</h2>
+          <button id="btn-add-link" class="btn btn-primary">
+            <i class="fa-solid fa-plus"></i> Adicionar
+          </button>
+        </div>
+        <div id="links-list" class="sortable-list"></div>
+      </section>
+
+      <!-- ── Tags ── -->
+      <section id="section-tags" class="admin-section">
+        <h2>Tags de Serviços</h2>
+        <div id="tags-list" class="tags-container"></div>
+        <div class="add-tag-row">
+          <div class="form-group" style="flex:1;margin-bottom:0">
+            <input type="text" id="new-tag-input" placeholder="Nova tag...">
+          </div>
+          <button id="btn-add-tag" class="btn btn-primary" style="align-self:flex-end">
+            <i class="fa-solid fa-plus"></i>
+          </button>
+        </div>
+      </section>
+
+      <!-- ── Redes Sociais ── -->
+      <section id="section-social" class="admin-section">
+        <div class="section-header">
+          <h2>Redes Sociais</h2>
+          <button id="btn-add-social" class="btn btn-primary">
+            <i class="fa-solid fa-plus"></i> Adicionar
+          </button>
+        </div>
+        <div id="social-list" class="sortable-list"></div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ MODAL -->
+<div id="modal-overlay" class="modal-overlay hidden">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 id="modal-title">Editar Link</h3>
+      <button id="modal-close" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Título</label>
+        <input type="text" id="modal-field-title" placeholder="Nome do link">
+      </div>
+      <div class="form-group" id="modal-group-subtitle">
+        <label>Subtítulo</label>
+        <input type="text" id="modal-field-subtitle" placeholder="Descrição curta">
+      </div>
+      <div class="form-group" id="modal-group-handle">
+        <label>Handle</label>
+        <input type="text" id="modal-field-handle" placeholder="@nome">
+      </div>
+      <div class="form-group">
+        <label>URL</label>
+        <input type="url" id="modal-field-url" placeholder="https://...">
+      </div>
+      <div class="form-group">
+        <label>Ícone</label>
+        <div id="icon-picker" class="icon-picker"></div>
+        <input type="text" id="modal-field-icon" placeholder="ou cole a classe: fa-brands fa-github">
+      </div>
+      <div class="form-group toggle-group">
+        <label>Ativo</label>
+        <label class="toggle">
+          <input type="checkbox" id="modal-field-active" checked>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button id="modal-cancel" class="btn btn-secondary">Cancelar</button>
+      <button id="modal-save" class="btn btn-primary">
+        <i class="fa-solid fa-floppy-disk"></i> Salvar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ TOAST -->
+<div id="toast" class="toast hidden"></div>
+
+<script type="module" src="admin.js"></script>
+</body>
+</html>
