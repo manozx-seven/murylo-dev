@@ -75,6 +75,21 @@ body {
   min-height: 1rem;
 }
 
+.btn-reset-link {
+  display: block;
+  width: 100%;
+  margin-top: .85rem;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: .75rem;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  text-align: center;
+  transition: color .2s;
+}
+.btn-reset-link:hover { color: var(--danger); }
+
 /* ── DASHBOARD LAYOUT ────────────────────────── */
 #screen-dashboard {
   display: flex;

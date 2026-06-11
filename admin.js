@@ -1,6 +1,6 @@
 import { db } from './firebase.js';
 import {
-  doc, getDoc, setDoc
+  doc, getDoc, setDoc, deleteDoc
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
@@ -143,13 +143,14 @@ async function initAuth() {
 }
 
 function bindSetup() {
-  $('btn-setup').addEventListener('click', async () => {
+  $('form-setup-el').addEventListener('submit', async e => {
+    e.preventDefault();
     const p = $('setup-pass').value;
     const c = $('setup-confirm').value;
     $('setup-error').textContent = '';
 
-    if (p.length < 6)      { $('setup-error').textContent = 'Senha deve ter ao menos 6 caracteres.'; return; }
-    if (p !== c)            { $('setup-error').textContent = 'As senhas não coincidem.'; return; }
+    if (p.length < 6) { $('setup-error').textContent = 'Senha deve ter ao menos 6 caracteres.'; return; }
+    if (p !== c)       { $('setup-error').textContent = 'As senhas não coincidem.'; return; }
 
     $('btn-setup').disabled = true;
     $('btn-setup').textContent = 'Salvando...';
@@ -157,8 +158,9 @@ function bindSetup() {
       await saveAuth(await sha256(p));
       saveSession();
       await enterDashboard();
-    } catch {
-      $('setup-error').textContent = 'Erro ao salvar. Tente novamente.';
+    } catch (err) {
+      console.error('[Admin] Erro ao salvar senha:', err);
+      $('setup-error').textContent = '⚠️ Erro ao salvar. Verifique as regras do Firestore.';
       $('btn-setup').disabled = false;
       $('btn-setup').textContent = 'Criar Senha';
     }
@@ -166,7 +168,8 @@ function bindSetup() {
 }
 
 function bindLogin(firestoreError = false) {
-  const doLogin = async () => {
+  $('form-login-el').addEventListener('submit', async e => {
+    e.preventDefault();
     if (isLocked()) {
       $('login-error').textContent = 'Muitas tentativas. Aguarde 30 minutos.';
       return;
@@ -182,14 +185,17 @@ function bindLogin(firestoreError = false) {
       const auth = await loadAuth();
       if (!auth) {
         $('login-error').textContent = 'Nenhuma senha cadastrada. Recarregue a página.';
+        $('btn-login').disabled = false;
+        $('btn-login').innerHTML = 'Entrar';
         return;
       }
       const hash = await sha256(p);
+      console.debug('[Admin] hash digitado:', hash, '| hash salvo:', auth.hash);
       if (auth.hash === hash) {
         clearFails();
         saveSession();
         await enterDashboard();
-        return; // sucesso — não reabilita o botão (já trocou de tela)
+        return;
       } else {
         const n = addFail();
         const left = MAX_FAILS - n;
@@ -198,18 +204,29 @@ function bindLogin(firestoreError = false) {
           : 'Conta bloqueada por 30 minutos.';
         $('login-pass').value = '';
       }
-    } catch (e) {
-      $('login-error').textContent =
-        '⚠️ Erro de conexão. Verifique as regras do Firestore e tente novamente.';
-      console.error('[Admin] Erro no login:', e);
+    } catch (err) {
+      $('login-error').textContent = '⚠️ Erro de conexão. Verifique as regras do Firestore.';
+      console.error('[Admin] Erro no login:', err);
     }
 
     $('btn-login').disabled = false;
     $('btn-login').innerHTML = 'Entrar';
-  };
+  });
 
-  $('btn-login').addEventListener('click', doLogin);
-  $('login-pass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  $('btn-reset').addEventListener('click', async () => {
+    const ok = confirm(
+      'Isso vai APAGAR a senha atual e deixar você definir uma nova.\n\nConfirmar redefinição?'
+    );
+    if (!ok) return;
+    try {
+      await deleteDoc(doc(db, 'admin', 'auth'));
+      clearSession();
+      clearFails();
+      location.reload();
+    } catch (err) {
+      alert('Erro ao redefinir: ' + err.message);
+    }
+  });
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────

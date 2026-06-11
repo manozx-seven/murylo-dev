@@ -23,16 +23,18 @@
       <div class="icon-lock"><i class="fa-solid fa-shield-halved"></i></div>
       <h1>Configuração Inicial</h1>
       <p>Defina a senha de administrador para este painel.</p>
-      <div class="form-group">
-        <label>Nova Senha</label>
-        <input type="password" id="setup-pass" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
-      </div>
-      <div class="form-group">
-        <label>Confirmar Senha</label>
-        <input type="password" id="setup-confirm" placeholder="Repita a senha" autocomplete="new-password">
-      </div>
-      <p class="error-msg" id="setup-error"></p>
-      <button id="btn-setup" class="btn btn-primary w-full mt-2">Criar Senha</button>
+      <form id="form-setup-el" action="javascript:void(0)" autocomplete="on">
+        <div class="form-group">
+          <label>Nova Senha</label>
+          <input type="password" id="setup-pass" name="new-password" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+        </div>
+        <div class="form-group">
+          <label>Confirmar Senha</label>
+          <input type="password" id="setup-confirm" name="confirm-password" placeholder="Repita a senha" autocomplete="new-password">
+        </div>
+        <p class="error-msg" id="setup-error"></p>
+        <button type="submit" id="btn-setup" class="btn btn-primary w-full mt-2">Criar Senha</button>
+      </form>
     </div>
 
     <!-- Login -->
@@ -40,12 +42,15 @@
       <div class="icon-lock"><i class="fa-solid fa-lock"></i></div>
       <h1>Painel Admin</h1>
       <p>Acesso restrito — insira sua senha para continuar.</p>
-      <div class="form-group">
-        <label>Senha</label>
-        <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password">
-      </div>
-      <p class="error-msg" id="login-error"></p>
-      <button id="btn-login" class="btn btn-primary w-full mt-2">Entrar</button>
+      <form id="form-login-el" action="javascript:void(0)" autocomplete="on">
+        <div class="form-group">
+          <label>Senha</label>
+          <input type="password" id="login-pass" name="password" placeholder="••••••••" autocomplete="current-password">
+        </div>
+        <p class="error-msg" id="login-error"></p>
+        <button type="submit" id="btn-login" class="btn btn-primary w-full mt-2">Entrar</button>
+      </form>
+      <button id="btn-reset" class="btn-reset-link">Esqueci / redefinir senha</button>
     </div>
 
   </div>
