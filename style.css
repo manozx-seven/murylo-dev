@@ -1,0 +1,240 @@
+:root {
+    --primary: #0ea5e9; /* Sky Blue */
+    --accent: #8b5cf6; /* Violet */
+    --bg-color: #020617; /* Slate 950 - Fundo muito escuro */
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg-color);
+    color: #f8fafc; /* Texto claro */
+    overflow-x: hidden;
+    margin: 0;
+    min-height: 100vh;
+}
+
+.font-code { font-family: 'JetBrains Mono', monospace; }
+
+/* Canvas Único para Partículas e Estrelas */
+#bg-canvas {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    z-index: -1;
+    pointer-events: none; /* Deixa passar cliques */
+}
+
+/* ---------------------------------------------------
+   GLASSMORPHISM ESCURO: Transparência e Desfoque
+   --------------------------------------------------- */
+.glass-panel {
+    background: rgba(255, 255, 255, 0.03); /* Quase transparente */
+    backdrop-filter: blur(12px); /* Desfoque intenso */
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08); /* Borda subtil */
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s ease;
+}
+
+/* Skeuomorphism no painel principal (header com foto) */
+header.glass-panel {
+    overflow: hidden;
+    /* Gradiente escuro: canto superior-esquerdo levemente mais claro simula fonte de luz */
+    background: linear-gradient(150deg, #0f1e35 0%, #060e1c 55%, #020810 100%);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-top: 1px solid rgba(255, 255, 255, 0.13);
+    box-shadow:
+        /* elevação física: sombra pesada embaixo/direita */
+        10px 10px 32px rgba(0, 0, 0, 0.8),
+        /* contra-luz sutil no topo/esquerda */
+        -3px -3px 12px rgba(255, 255, 255, 0.025),
+        /* aresta superior iluminada (luz bate no topo) */
+        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+        /* face inferior em sombra */
+        inset 0 -4px 14px rgba(0, 0, 0, 0.55),
+        /* laterais em sombra leve para dar profundidade */
+        inset 3px 0 10px rgba(0, 0, 0, 0.3),
+        inset -3px 0 10px rgba(0, 0, 0, 0.3);
+}
+
+/* Pseudo-elemento não usado — reset explícito */
+header.glass-panel::before,
+header.glass-panel::after {
+    content: none;
+}
+
+.link-item { position: relative; overflow: hidden; }
+
+.link-item:hover {
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.08); /* Fica mais claro no hover */
+    box-shadow: 0 10px 30px -10px rgba(14, 165, 233, 0.3);
+    border-color: rgba(14, 165, 233, 0.4);
+}
+
+.icon-box {
+    position: relative;
+    overflow: hidden;
+    /* Vidro com leve tint azulado — igual ao iOS */
+    background: linear-gradient(
+        150deg,
+        rgba(200, 225, 255, 0.12) 0%,
+        rgba(160, 200, 255, 0.05) 55%,
+        rgba(120, 160, 255, 0.08) 100%
+    );
+    backdrop-filter: blur(40px) saturate(2) brightness(1.2) contrast(1.06);
+    -webkit-backdrop-filter: blur(40px) saturate(2) brightness(1.2) contrast(1.06);
+    /* Borda não-uniforme: topo bem mais brilhante que o resto */
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-top: 1.5px solid rgba(255, 255, 255, 0.62);
+    box-shadow:
+        /* profundidade externa */
+        0 12px 40px rgba(0, 0, 0, 0.55),
+        0 4px 10px rgba(0, 0, 0, 0.3),
+        /* rim light superior — aresta iluminada do vidro */
+        inset 0 2px 0 rgba(255, 255, 255, 0.72),
+        /* rims laterais assimétricos */
+        inset 2px 0 0 rgba(255, 255, 255, 0.1),
+        inset -2px 0 0 rgba(255, 255, 255, 0.04),
+        /* menisco inferior — borda escura onde o vidro termina */
+        inset 0 -1.5px 0 rgba(0, 0, 0, 0.22),
+        /* brilho interno difuso */
+        inset 0 0 22px rgba(255, 255, 255, 0.05);
+    transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* Hot-spot especular — bolha de luz elíptica no canto superior */
+.icon-box::before {
+    content: '';
+    position: absolute;
+    top: -30%;
+    left: -10%;
+    width: 125%;
+    height: 70%;
+    background: radial-gradient(
+        ellipse at 36% 18%,
+        rgba(255, 255, 255, 0.38) 0%,
+        rgba(255, 255, 255, 0.16) 28%,
+        rgba(255, 255, 255, 0.04) 52%,
+        transparent 68%
+    );
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Tint prismático na base — o vidro real dispersa cor na aresta inferior */
+.icon-box::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 38%;
+    background: linear-gradient(
+        to top,
+        rgba(90, 150, 255, 0.1) 0%,
+        rgba(180, 90, 255, 0.05) 55%,
+        transparent 100%
+    );
+    pointer-events: none;
+    z-index: 0;
+}
+
+.icon-box i {
+    position: relative;
+    z-index: 1;
+}
+
+.link-item:hover .icon-box {
+    /* Gradiente sólido original + rim light do Liquid Glass */
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    backdrop-filter: blur(40px) saturate(3) brightness(1.3);
+    -webkit-backdrop-filter: blur(40px) saturate(3) brightness(1.3);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-top: 1.5px solid rgba(255, 255, 255, 0.72);
+    transform: rotate(5deg) scale(1.1);
+    box-shadow:
+        0 18px 50px rgba(14, 165, 233, 0.45),
+        inset 0 2px 0 rgba(255, 255, 255, 0.55),
+        inset 2px 0 0 rgba(255, 255, 255, 0.12),
+        inset -2px 0 0 rgba(255, 255, 255, 0.05),
+        inset 0 -1.5px 0 rgba(0, 0, 0, 0.2);
+}
+
+/* Texto Gradiente Claro */
+.text-gradient {
+    background: linear-gradient(135deg, #ffffff, #94a3b8, var(--primary));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+/* Animações de Entrada */
+.fade-in {
+    opacity: 0; transform: translateY(15px);
+    animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes fadeIn { to { opacity: 1; transform: translateY(0); } }
+.delay-1 { animation-delay: 0.1s; }
+.delay-2 { animation-delay: 0.2s; }
+.delay-3 { animation-delay: 0.3s; }
+.delay-4 { animation-delay: 0.4s; }
+.delay-5 { animation-delay: 0.5s; }
+
+/* Bolinha de Status */
+.status-dot {
+    width: 8px; height: 8px;
+    background-color: #22c55e;
+    border-radius: 50%;
+    position: relative;
+}
+.status-dot::after {
+    content: ''; position: absolute;
+    top: -4px; left: -4px; right: -4px; bottom: -4px;
+    border-radius: 50%; border: 2px solid #22c55e;
+    animation: ping 1.5s infinite;
+}
+@keyframes ping { 75%, 100% { transform: scale(1.5); opacity: 0; } }
+
+/* Tooltip */
+.copy-tooltip {
+    position: absolute;
+    top: -30px;
+    right: 0;
+    background: #10b981;
+    color: white;
+    font-size: 10px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    opacity: 0;
+    transform: translateY(5px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+    pointer-events: none;
+}
+
+.copy-tooltip.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Bloqueia zoom por toque */
+html {
+    touch-action: manipulation;
+}
+
+* {
+    -ms-touch-action: manipulation;
+    touch-action: manipulation;
+}
+
+/* Evita zoom ao dar double-tap em inputs */
+input, select, textarea {
+    font-size: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fade-in { animation: none; opacity: 1; transform: none; }
+    .status-dot::after { animation: none; }
+}
