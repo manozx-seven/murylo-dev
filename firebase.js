@@ -1,5 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { initializeFirestore } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAUvIZVOGQedPuAeHeGv2tBN0jfdebHrCc",
@@ -11,4 +11,24 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+
+// experimentalAutoDetectLongPolling: detecta proxies/firewalls corporativos
+// (ex.: rede do tribunal) que bloqueiam o streaming padrão do Firestore e
+// que faziam as escritas ficarem "salvando eternamente". Com long-polling
+// automático a conexão funciona mesmo atrás desses proxies.
+export const db = initializeFirestore(app, {
+  experimentalAutoDetectLongPolling: true,
+});
+
+// Garante que nenhuma operação do Firestore trave a interface para sempre.
+// Se o servidor não responder em `ms`, rejeita com erro "timeout:<label>".
+// Para escritas isso é seguro: o dado já fica no cache local e sincroniza depois.
+export function withTimeout(promise, ms = 8000, label = 'op') {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`timeout:${label}`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+export const isTimeout = err => String(err?.message || '').startsWith('timeout');

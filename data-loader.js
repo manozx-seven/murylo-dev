@@ -81,10 +81,24 @@ function renderBio(cfg) {
 // Renderiza defaults imediatamente (sem flash), depois atualiza do Firestore
 renderBio(DEFAULT);
 
+// ── Preview ao vivo ────────────────────────────────────────────────────────────
+// Quando esta página é carregada dentro do painel (iframe), o admin envia o
+// estado atual (ainda não salvo) via postMessage para refletir as edições em
+// tempo real. Assim que recebemos uma prévia, ignoramos o que vier do Firestore
+// para não sobrescrever o que o usuário está editando.
+let livePreview = false;
+window.addEventListener('message', e => {
+  const data = e.data;
+  if (data && data.type === 'bio-preview' && data.config) {
+    livePreview = true;
+    renderBio(data.config);
+  }
+});
+
 (async () => {
   try {
     const snap = await getDoc(doc(db, 'bio', 'config'));
-    if (snap.exists()) renderBio(snap.data());
+    if (snap.exists() && !livePreview) renderBio(snap.data());
   } catch {
     // Firestore indisponível — mantém defaults já renderizados
   }

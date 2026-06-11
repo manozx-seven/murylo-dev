@@ -19,38 +19,104 @@
   <div class="auth-card">
 
     <!-- First-time setup -->
-    <div id="form-setup" class="hidden">
+    <div id="panel-setup" class="auth-panel hidden">
       <div class="icon-lock"><i class="fa-solid fa-shield-halved"></i></div>
       <h1>Configuração Inicial</h1>
       <p>Defina a senha de administrador para este painel.</p>
       <form id="form-setup-el" action="javascript:void(0)" autocomplete="on">
         <div class="form-group">
           <label>Nova Senha</label>
-          <input type="password" id="setup-pass" name="new-password" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+          <div class="input-wrap">
+            <input type="password" id="setup-pass" name="new-password" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+            <button type="button" class="reveal-btn" data-target="setup-pass" title="Mostrar/ocultar"><i class="fa-solid fa-eye"></i></button>
+          </div>
         </div>
         <div class="form-group">
           <label>Confirmar Senha</label>
-          <input type="password" id="setup-confirm" name="confirm-password" placeholder="Repita a senha" autocomplete="new-password">
+          <div class="input-wrap">
+            <input type="password" id="setup-confirm" name="confirm-password" placeholder="Repita a senha" autocomplete="new-password">
+            <button type="button" class="reveal-btn" data-target="setup-confirm" title="Mostrar/ocultar"><i class="fa-solid fa-eye"></i></button>
+          </div>
         </div>
         <p class="error-msg" id="setup-error"></p>
         <button type="submit" id="btn-setup" class="btn btn-primary w-full mt-2">Criar Senha</button>
       </form>
     </div>
 
+    <!-- Recovery code shown after setup / regenerate -->
+    <div id="panel-recovery" class="auth-panel hidden">
+      <div class="icon-lock"><i class="fa-solid fa-key"></i></div>
+      <h1>Código de Recuperação</h1>
+      <p>Guarde este código em local seguro. É a <strong>única</strong> forma de redefinir a senha caso você a esqueça.</p>
+      <div class="recovery-box">
+        <code id="recovery-code">----</code>
+        <button type="button" id="btn-copy-recovery" class="btn-copy" title="Copiar"><i class="fa-regular fa-copy"></i></button>
+      </div>
+      <label class="confirm-check">
+        <input type="checkbox" id="recovery-ack">
+        <span>Salvei o código em um local seguro.</span>
+      </label>
+      <button type="button" id="btn-recovery-continue" class="btn btn-primary w-full mt-2" disabled>Continuar</button>
+    </div>
+
     <!-- Login -->
-    <div id="form-login">
+    <div id="panel-login" class="auth-panel hidden">
       <div class="icon-lock"><i class="fa-solid fa-lock"></i></div>
       <h1>Painel Admin</h1>
       <p>Acesso restrito — insira sua senha para continuar.</p>
       <form id="form-login-el" action="javascript:void(0)" autocomplete="on">
         <div class="form-group">
           <label>Senha</label>
-          <input type="password" id="login-pass" name="password" placeholder="••••••••" autocomplete="current-password">
+          <div class="input-wrap">
+            <input type="password" id="login-pass" name="password" placeholder="••••••••" autocomplete="current-password">
+            <button type="button" class="reveal-btn" data-target="login-pass" title="Mostrar/ocultar"><i class="fa-solid fa-eye"></i></button>
+          </div>
         </div>
         <p class="error-msg" id="login-error"></p>
         <button type="submit" id="btn-login" class="btn btn-primary w-full mt-2">Entrar</button>
       </form>
       <button id="btn-reset" class="btn-reset-link">Esqueci / redefinir senha</button>
+    </div>
+
+    <!-- Reset step 1: recovery code -->
+    <div id="panel-reset" class="auth-panel hidden">
+      <div class="icon-lock"><i class="fa-solid fa-unlock-keyhole"></i></div>
+      <h1>Redefinir Senha</h1>
+      <p>Digite o código de recuperação gerado na configuração inicial.</p>
+      <form id="form-reset-el" action="javascript:void(0)">
+        <div class="form-group">
+          <label>Código de Recuperação</label>
+          <input type="text" id="reset-code" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false">
+        </div>
+        <p class="error-msg" id="reset-error"></p>
+        <button type="submit" id="btn-reset-verify" class="btn btn-primary w-full mt-2">Verificar Código</button>
+      </form>
+      <button id="btn-reset-back" class="btn-reset-link">Voltar ao login</button>
+    </div>
+
+    <!-- Reset step 2: new password -->
+    <div id="panel-reset-new" class="auth-panel hidden">
+      <div class="icon-lock"><i class="fa-solid fa-shield-halved"></i></div>
+      <h1>Nova Senha</h1>
+      <p>Código verificado. Defina uma nova senha de administrador.</p>
+      <form id="form-reset-new-el" action="javascript:void(0)" autocomplete="on">
+        <div class="form-group">
+          <label>Nova Senha</label>
+          <div class="input-wrap">
+            <input type="password" id="reset-new-pass" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+            <button type="button" class="reveal-btn" data-target="reset-new-pass" title="Mostrar/ocultar"><i class="fa-solid fa-eye"></i></button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Confirmar Senha</label>
+          <div class="input-wrap">
+            <input type="password" id="reset-new-confirm" placeholder="Repita a senha" autocomplete="new-password">
+            <button type="button" class="reveal-btn" data-target="reset-new-confirm" title="Mostrar/ocultar"><i class="fa-solid fa-eye"></i></button>
+          </div>
+        </div>
+        <p class="error-msg" id="reset-new-error"></p>
+        <button type="submit" id="btn-reset-save" class="btn btn-primary w-full mt-2">Salvar Nova Senha</button>
+      </form>
     </div>
 
   </div>
@@ -66,11 +132,14 @@
       Painel Admin
     </div>
     <div class="topbar-actions">
+      <button id="btn-toggle-preview" class="btn btn-secondary" title="Mostrar/ocultar preview">
+        <i class="fa-solid fa-eye"></i> <span class="btn-label">Preview</span>
+      </button>
       <a href="index.html" target="_blank" class="btn btn-secondary">
-        <i class="fa-solid fa-arrow-up-right-from-square"></i> Ver Bio
+        <i class="fa-solid fa-arrow-up-right-from-square"></i> <span class="btn-label">Ver Bio</span>
       </a>
       <button id="btn-logout" class="btn btn-danger">
-        <i class="fa-solid fa-right-from-bracket"></i> Sair
+        <i class="fa-solid fa-right-from-bracket"></i> <span class="btn-label">Sair</span>
       </button>
     </div>
   </header>
@@ -93,6 +162,9 @@
       </button>
       <button class="nav-item" data-section="social">
         <i class="fa-solid fa-share-nodes"></i> Redes Sociais
+      </button>
+      <button class="nav-item" data-section="seguranca">
+        <i class="fa-solid fa-shield-halved"></i> Segurança
       </button>
     </nav>
 
@@ -178,7 +250,96 @@
         <div id="social-list" class="sortable-list"></div>
       </section>
 
+      <!-- ── Segurança ── -->
+      <section id="section-seguranca" class="admin-section">
+        <h2>Segurança</h2>
+
+        <!-- Alterar senha -->
+        <div class="sec-card">
+          <h3><i class="fa-solid fa-key"></i> Alterar senha</h3>
+          <div class="form-group">
+            <label>Senha atual</label>
+            <div class="input-wrap">
+              <input type="password" id="sec-current" placeholder="••••••••" autocomplete="current-password">
+              <button type="button" class="reveal-btn" data-target="sec-current"><i class="fa-solid fa-eye"></i></button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Nova senha</label>
+            <div class="input-wrap">
+              <input type="password" id="sec-new" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+              <button type="button" class="reveal-btn" data-target="sec-new"><i class="fa-solid fa-eye"></i></button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Confirmar nova senha</label>
+            <div class="input-wrap">
+              <input type="password" id="sec-confirm" placeholder="Repita a nova senha" autocomplete="new-password">
+              <button type="button" class="reveal-btn" data-target="sec-confirm"><i class="fa-solid fa-eye"></i></button>
+            </div>
+          </div>
+          <button id="btn-change-pass" class="btn btn-primary">
+            <i class="fa-solid fa-floppy-disk"></i> Atualizar senha
+          </button>
+        </div>
+
+        <!-- Código de recuperação -->
+        <div class="sec-card">
+          <h3><i class="fa-solid fa-life-ring"></i> Código de recuperação</h3>
+          <p class="sec-desc">Gere um novo código de recuperação caso tenha perdido o atual. O código anterior deixa de funcionar.</p>
+          <div class="form-group">
+            <label>Confirme com a senha atual</label>
+            <div class="input-wrap">
+              <input type="password" id="sec-recov-pass" placeholder="••••••••" autocomplete="current-password">
+              <button type="button" class="reveal-btn" data-target="sec-recov-pass"><i class="fa-solid fa-eye"></i></button>
+            </div>
+          </div>
+          <button id="btn-regen-recovery" class="btn btn-secondary">
+            <i class="fa-solid fa-rotate"></i> Gerar novo código
+          </button>
+          <div id="sec-recovery-display" class="recovery-box hidden" style="margin-top:1rem">
+            <code id="sec-recovery-code">----</code>
+            <button type="button" id="btn-copy-sec-recovery" class="btn-copy" title="Copiar"><i class="fa-regular fa-copy"></i></button>
+          </div>
+        </div>
+
+        <!-- Dica de segurança -->
+        <div class="sec-card sec-tip">
+          <h3><i class="fa-solid fa-triangle-exclamation"></i> Recomendação importante</h3>
+          <p class="sec-desc">Este painel valida a senha no navegador. Para segurança real, restrinja a escrita no banco com regras do Firestore. Regras sugeridas:</p>
+          <pre class="rules-block">rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+    // Bio: leitura pública, escrita bloqueada via web
+    match /bio/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /admin/{doc} {
+      allow read, write: if false;
+    }
+  }
+}</pre>
+          <p class="sec-desc">Com isso, edições passam a exigir o Firebase Console / Admin SDK. Para edição pelo painel com segurança total, migre para o <strong>Firebase Authentication</strong>.</p>
+        </div>
+      </section>
+
     </main>
+
+    <!-- Preview ao vivo -->
+    <aside class="preview-pane" id="preview-pane">
+      <div class="preview-toolbar">
+        <span><i class="fa-solid fa-mobile-screen"></i> Pré-visualização</span>
+        <div class="preview-toolbar-actions">
+          <button id="btn-reload-preview" class="preview-tool-btn" title="Recarregar"><i class="fa-solid fa-rotate-right"></i></button>
+          <button id="btn-close-preview" class="preview-tool-btn" title="Fechar"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      </div>
+      <div class="preview-device">
+        <iframe id="preview-frame" src="index.html" title="Preview da Bio"></iframe>
+      </div>
+    </aside>
+
   </div>
 </div>
 
