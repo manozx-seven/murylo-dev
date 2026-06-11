@@ -1,16 +1,16 @@
-import { db, withTimeout, isTimeout } from './firebase.js';
+import { db, auth, withTimeout, isTimeout } from './firebase.js';
 import {
-  doc, getDoc, setDoc, deleteDoc
+  doc, getDoc, setDoc
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import {
+  onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
+  EmailAuthProvider, reauthenticateWithCredential, updatePassword
+} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
-const SESSION_KEY  = 'bio_admin_sess';
-const SESSION_TTL  = 8 * 60 * 60 * 1000; // 8 horas
-const FAIL_KEY     = 'bio_admin_fails';
-const MAX_FAILS    = 5;
-const LOCKOUT_MS   = 30 * 60 * 1000; // 30 min
 const WRITE_TIMEOUT = 8000;
 const READ_TIMEOUT  = 8000;
+const AUTH_TIMEOUT  = 12000;
 
 const ICONS = [
   { label: 'Site',       cls: 'fa-solid fa-globe' },
@@ -40,31 +40,17 @@ const ICONS = [
 
 // ── Estado global ─────────────────────────────────────────────────────────────
 let bioConfig = null;
-let authDoc = null;            // { hash, recoveryHash, v }
+let currentUser = null;
+let inDashboard = false;
 let modalMode = 'link';
 let editingId = null;
-let setupCtx = null;           // { hash, recovery } durante o setup
-let resetCtx = null;           // { recoveryHash } durante o reset
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
 
-async function sha256(str) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
-
-function genRecoveryCode() {
-  const bytes = crypto.getRandomValues(new Uint8Array(10));
-  const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
-  return hex.match(/.{1,4}/g).join('-'); // XXXX-XXXX-XXXX-XXXX-XXXX
-}
-
-const normalizeRecovery = c => (c || '').replace(/[^a-z0-9]/gi, '').toUpperCase();
 
 // Executa uma ação assíncrona mostrando spinner no botão e bloqueando-o.
 async function runWithSpinner(btn, fn, loadingText = '') {
@@ -85,30 +71,20 @@ async function runWithSpinner(btn, fn, loadingText = '') {
   }
 }
 
-// ── Rate limiting ─────────────────────────────────────────────────────────────
-function getFails() {
-  const d = JSON.parse(localStorage.getItem(FAIL_KEY) || '{"n":0,"t":0}');
-  if (Date.now() - d.t > LOCKOUT_MS) return { n: 0, t: 0 };
-  return d;
+// Traduz códigos de erro do Firebase Auth para mensagens amigáveis.
+function authErrorMsg(e) {
+  const c = String(e?.code || '');
+  if (isTimeout(e) || c.includes('network')) return 'Falha de conexão. Verifique sua rede e tente novamente.';
+  if (c.includes('invalid-credential') || c.includes('wrong-password') || c.includes('user-not-found'))
+    return 'E-mail ou senha incorretos.';
+  if (c.includes('invalid-email'))     return 'E-mail inválido.';
+  if (c.includes('too-many-requests')) return 'Muitas tentativas. Tente novamente mais tarde.';
+  if (c.includes('user-disabled'))     return 'Esta conta foi desativada.';
+  if (c.includes('operation-not-allowed')) return 'Login por e-mail/senha não está habilitado no Firebase Console.';
+  if (c.includes('configuration-not-found')) return 'Authentication não configurado no Firebase Console.';
+  if (c.includes('requires-recent-login')) return 'Por segurança, saia e entre novamente antes de alterar a senha.';
+  return 'Não foi possível concluir. Tente novamente.';
 }
-function addFail() {
-  const d = getFails();
-  d.n++; if (d.t === 0) d.t = Date.now();
-  localStorage.setItem(FAIL_KEY, JSON.stringify(d));
-  return d.n;
-}
-function clearFails() { localStorage.removeItem(FAIL_KEY); }
-function isLocked() { const d = getFails(); return d.n >= MAX_FAILS; }
-
-// ── Session ───────────────────────────────────────────────────────────────────
-function saveSession() {
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify({ at: Date.now(), exp: Date.now() + SESSION_TTL }));
-}
-function hasSession() {
-  const s = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null');
-  return s && Date.now() < s.exp;
-}
-function clearSession() { sessionStorage.removeItem(SESSION_KEY); }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
 let _toastTimer;
@@ -121,13 +97,6 @@ function toast(msg, type = 'success') {
 }
 
 // ── Firestore (com timeout) ─────────────────────────────────────────────────────
-async function loadAuth() {
-  const snap = await withTimeout(getDoc(doc(db, 'admin', 'auth')), READ_TIMEOUT, 'loadAuth');
-  return snap.exists() ? snap.data() : null;
-}
-async function saveAuth(data) {
-  await withTimeout(setDoc(doc(db, 'admin', 'auth'), data), WRITE_TIMEOUT, 'saveAuth');
-}
 async function loadConfig() {
   const snap = await withTimeout(getDoc(doc(db, 'bio', 'config')), READ_TIMEOUT, 'loadConfig');
   return snap.exists() ? snap.data() : null;
@@ -152,33 +121,30 @@ function showAuthPanel(id) {
 }
 
 // ── Boot da autenticação ────────────────────────────────────────────────────────
-async function initAuth() {
+function initAuth() {
   bindRevealButtons();
   bindAuthHandlers();
 
-  if (hasSession()) {
-    try { await enterDashboard(); return; }
-    catch { clearSession(); }
-  }
+  // O Firebase restaura a sessão automaticamente (persistência local).
+  onAuthStateChanged(auth, async user => {
+    currentUser = user || null;
+    if (user) {
+      if (!inDashboard) {
+        inDashboard = true;
+        try { await enterDashboard(); }
+        catch (e) { console.error('[Admin] Erro ao abrir dashboard:', e); }
+      }
+      updateAccountInfo();
+    } else {
+      inDashboard = false;
+      showScreen('screen-auth');
+      showAuthPanel('panel-login');
+    }
+  });
+}
 
-  showScreen('screen-auth');
-
-  try {
-    authDoc = await loadAuth();
-  } catch (e) {
-    console.error('[Admin] Erro ao carregar auth:', e);
-    $('login-error').textContent = isTimeout(e)
-      ? '⚠️ Conexão lenta/bloqueada. Verifique sua rede e tente novamente.'
-      : '⚠️ Erro de conexão com o Firestore. Verifique as regras do banco.';
-    showAuthPanel('panel-login');
-    return;
-  }
-
-  if (!authDoc) {
-    showAuthPanel('panel-setup');
-  } else {
-    showAuthPanel('panel-login');
-  }
+function updateAccountInfo() {
+  if (currentUser && $('account-email')) $('account-email').textContent = currentUser.email || '—';
 }
 
 // ── Reveal de senha ──────────────────────────────────────────────────────────────
@@ -196,175 +162,57 @@ function bindRevealButtons() {
 
 // ── Handlers de auth (ligados uma única vez) ────────────────────────────────────
 function bindAuthHandlers() {
-  // SETUP ─ definir senha e gerar código de recuperação
-  $('form-setup-el').addEventListener('submit', async e => {
-    e.preventDefault();
-    const p = $('setup-pass').value;
-    const c = $('setup-confirm').value;
-    $('setup-error').textContent = '';
-    if (p.length < 6) { $('setup-error').textContent = 'Senha deve ter ao menos 6 caracteres.'; return; }
-    if (p !== c)      { $('setup-error').textContent = 'As senhas não coincidem.'; return; }
-
-    await runWithSpinner($('btn-setup'), async () => {
-      const recovery = genRecoveryCode();
-      setupCtx = {
-        hash: await sha256(p),
-        recoveryHash: await sha256(normalizeRecovery(recovery)),
-      };
-      $('recovery-code').textContent = recovery;
-      $('recovery-ack').checked = false;
-      $('btn-recovery-continue').disabled = true;
-      $('btn-recovery-continue').dataset.flow = 'setup';
-      showAuthPanel('panel-recovery');
-    }, 'Gerando...');
-  });
-
-  // RECOVERY ─ confirmar que guardou o código e prosseguir
-  $('recovery-ack').addEventListener('change', () => {
-    $('btn-recovery-continue').disabled = !$('recovery-ack').checked;
-  });
-  $('btn-copy-recovery').addEventListener('click', () => copyText($('recovery-code').textContent, $('btn-copy-recovery')));
-  $('btn-recovery-continue').addEventListener('click', async () => {
-    if (!setupCtx) return;
-    await runWithSpinner($('btn-recovery-continue'), async () => {
-      try {
-        await saveAuth({ hash: setupCtx.hash, recoveryHash: setupCtx.recoveryHash, v: 2 });
-      } catch (err) {
-        if (!isTimeout(err)) {
-          toast('Erro ao salvar. Verifique as regras do Firestore.', 'error');
-          throw err;
-        }
-        // timeout: gravação ficou no cache local e sincroniza depois — prossegue
-        toast('Salvo localmente — sincronizando...', 'info');
-      }
-      authDoc = { hash: setupCtx.hash, recoveryHash: setupCtx.recoveryHash, v: 2 };
-      setupCtx = null;
-      saveSession();
-      await enterDashboard();
-    }, 'Salvando...');
-  });
-
   // LOGIN
   $('form-login-el').addEventListener('submit', async e => {
     e.preventDefault();
-    if (isLocked()) { $('login-error').textContent = 'Muitas tentativas. Aguarde 30 minutos.'; return; }
-    const p = $('login-pass').value;
-    if (!p) { $('login-error').textContent = 'Informe a senha.'; return; }
+    const email = $('login-email').value.trim();
+    const pass  = $('login-pass').value;
     $('login-error').textContent = '';
+    if (!email || !pass) { $('login-error').textContent = 'Informe e-mail e senha.'; return; }
 
     await runWithSpinner($('btn-login'), async () => {
-      let auth;
-      try { auth = authDoc || await loadAuth(); }
-      catch (err) {
-        $('login-error').textContent = isTimeout(err)
-          ? '⚠️ Conexão lenta/bloqueada. Tente novamente.'
-          : '⚠️ Erro de conexão. Verifique as regras do Firestore.';
-        return;
-      }
-      if (!auth) { $('login-error').textContent = 'Nenhuma senha cadastrada. Recarregue a página.'; return; }
-      authDoc = auth;
-
-      if (auth.hash === await sha256(p)) {
-        clearFails();
-        saveSession();
-        await enterDashboard();
-        return;
-      }
-      const n = addFail();
-      const left = MAX_FAILS - n;
-      $('login-error').textContent = left > 0
-        ? `Senha incorreta. ${left} tentativa(s) restante(s).`
-        : 'Conta bloqueada por 30 minutos.';
-      $('login-pass').value = '';
-    }, 'Verificando...');
-  });
-
-  // Ir para o fluxo de reset
-  $('btn-reset').addEventListener('click', () => {
-    $('reset-code').value = '';
-    $('reset-error').textContent = '';
-    showAuthPanel('panel-reset');
-    $('reset-code').focus();
-  });
-  $('btn-reset-back').addEventListener('click', () => showAuthPanel('panel-login'));
-
-  // RESET passo 1 ─ verificar código de recuperação
-  $('form-reset-el').addEventListener('submit', async e => {
-    e.preventDefault();
-    if (isLocked()) { $('reset-error').textContent = 'Muitas tentativas. Aguarde 30 minutos.'; return; }
-    const code = $('reset-code').value.trim();
-    $('reset-error').textContent = '';
-    if (!code) { $('reset-error').textContent = 'Informe o código de recuperação.'; return; }
-
-    await runWithSpinner($('btn-reset-verify'), async () => {
-      let auth;
-      try { auth = authDoc || await loadAuth(); }
-      catch (err) {
-        $('reset-error').textContent = isTimeout(err) ? '⚠️ Conexão lenta/bloqueada. Tente novamente.' : '⚠️ Erro de conexão.';
-        return;
-      }
-      if (!auth) { $('reset-error').textContent = 'Nenhuma senha cadastrada.'; return; }
-      authDoc = auth;
-
-      if (!auth.recoveryHash) {
-        $('reset-error').textContent = 'Esta conta não tem código de recuperação. Faça login e gere um em Segurança.';
-        return;
-      }
-      if (await sha256(normalizeRecovery(code)) === auth.recoveryHash) {
-        clearFails();
-        resetCtx = { recoveryHash: auth.recoveryHash };
-        $('reset-new-pass').value = '';
-        $('reset-new-confirm').value = '';
-        $('reset-new-error').textContent = '';
-        showAuthPanel('panel-reset-new');
-        $('reset-new-pass').focus();
-      } else {
-        const n = addFail();
-        const left = MAX_FAILS - n;
-        $('reset-error').textContent = left > 0
-          ? `Código incorreto. ${left} tentativa(s) restante(s).`
-          : 'Bloqueado por 30 minutos.';
-      }
-    }, 'Verificando...');
-  });
-
-  // RESET passo 2 ─ salvar nova senha
-  $('form-reset-new-el').addEventListener('submit', async e => {
-    e.preventDefault();
-    const p = $('reset-new-pass').value;
-    const c = $('reset-new-confirm').value;
-    $('reset-new-error').textContent = '';
-    if (p.length < 6) { $('reset-new-error').textContent = 'Senha deve ter ao menos 6 caracteres.'; return; }
-    if (p !== c)      { $('reset-new-error').textContent = 'As senhas não coincidem.'; return; }
-    if (!resetCtx)    { showAuthPanel('panel-login'); return; }
-
-    await runWithSpinner($('btn-reset-save'), async () => {
-      const newDoc = { hash: await sha256(p), recoveryHash: resetCtx.recoveryHash, v: 2 };
       try {
-        await saveAuth(newDoc);
+        await withTimeout(signInWithEmailAndPassword(auth, email, pass), AUTH_TIMEOUT, 'login');
+        // onAuthStateChanged cuida de abrir o dashboard.
       } catch (err) {
-        if (!isTimeout(err)) { toast('Erro ao salvar nova senha.', 'error'); throw err; }
-        toast('Salvo localmente — sincronizando...', 'info');
+        console.error('[Admin] Erro no login:', err);
+        $('login-error').textContent = authErrorMsg(err);
       }
-      authDoc = newDoc;
-      resetCtx = null;
-      clearFails();
-      saveSession();
-      await enterDashboard();
-    }, 'Salvando...');
+    }, 'Entrando...');
   });
-}
 
-function copyText(text, btn) {
-  navigator.clipboard?.writeText(text).then(() => {
-    if (btn) {
-      const i = btn.querySelector('i');
-      const prev = i.className;
-      i.className = 'fa-solid fa-check';
-      setTimeout(() => { i.className = prev; }, 1400);
-    }
-    toast('Código copiado!', 'success');
-  }).catch(() => toast('Não foi possível copiar.', 'error'));
+  // Ir para "esqueci a senha"
+  $('btn-forgot').addEventListener('click', () => {
+    $('forgot-email').value = $('login-email').value.trim();
+    $('forgot-error').textContent = '';
+    showAuthPanel('panel-forgot');
+    $('forgot-email').focus();
+  });
+  $('btn-forgot-back').addEventListener('click', () => showAuthPanel('panel-login'));
+
+  // Enviar e-mail de redefinição
+  $('form-forgot-el').addEventListener('submit', async e => {
+    e.preventDefault();
+    const email = $('forgot-email').value.trim();
+    $('forgot-error').textContent = '';
+    if (!email) { $('forgot-error').textContent = 'Informe o e-mail da conta.'; return; }
+
+    await runWithSpinner($('btn-forgot-send'), async () => {
+      try {
+        await withTimeout(sendPasswordResetEmail(auth, email), AUTH_TIMEOUT, 'reset');
+      } catch (err) {
+        // Não revela se o e-mail existe (evita enumeração), exceto erros técnicos.
+        if (isTimeout(err) || String(err?.code).includes('network')) {
+          $('forgot-error').textContent = 'Falha de conexão. Tente novamente.'; return;
+        }
+        if (String(err?.code).includes('invalid-email')) {
+          $('forgot-error').textContent = 'E-mail inválido.'; return;
+        }
+      }
+      toast('Se o e-mail existir, enviamos o link de redefinição.', 'success');
+      showAuthPanel('panel-login');
+    }, 'Enviando...');
+  });
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
@@ -404,6 +252,7 @@ async function enterDashboard() {
   renderSocial();
   buildIconPicker();
   if (!dashboardBound) { bindDashboard(); dashboardBound = true; }
+  updateAccountInfo();
   if (window.innerWidth >= 1100) setPreview(true);
   updatePreview();
 }
@@ -431,7 +280,9 @@ function bindDashboard() {
     });
   });
 
-  $('btn-logout').addEventListener('click', () => { clearSession(); location.reload(); });
+  $('btn-logout').addEventListener('click', () => runWithSpinner($('btn-logout'), async () => {
+    try { await signOut(auth); } catch { /* onAuthStateChanged trata */ }
+  }, 'Saindo...'));
 
   // Preview
   $('btn-toggle-preview').addEventListener('click', togglePreview);
@@ -442,11 +293,8 @@ function bindDashboard() {
   });
   const pf = $('preview-frame');
   pf.addEventListener('load', () => { previewReady = true; updatePreview(); });
-  // O iframe pode já ter carregado antes deste listener (carrega mesmo oculto)
   try {
-    if (pf.contentDocument && pf.contentDocument.readyState === 'complete') {
-      previewReady = true;
-    }
+    if (pf.contentDocument && pf.contentDocument.readyState === 'complete') previewReady = true;
   } catch { /* mesma origem; ignora */ }
 
   // Live sync perfil + status -> preview
@@ -489,41 +337,36 @@ function bindDashboard() {
 
 // ── Segurança ─────────────────────────────────────────────────────────────────
 function bindSecurity() {
+  // Alterar senha (reautentica e atualiza no Firebase)
   $('btn-change-pass').addEventListener('click', () => runWithSpinner($('btn-change-pass'), async () => {
     const cur = $('sec-current').value;
     const nw  = $('sec-new').value;
     const cf  = $('sec-confirm').value;
-    if (!authDoc) { toast('Sessão inválida. Recarregue a página.', 'error'); return; }
-    if (await sha256(cur) !== authDoc.hash) { toast('Senha atual incorreta.', 'error'); return; }
+    if (!currentUser) { toast('Sessão expirada. Faça login novamente.', 'error'); return; }
     if (nw.length < 6) { toast('Nova senha deve ter ao menos 6 caracteres.', 'error'); return; }
     if (nw !== cf)     { toast('As senhas não coincidem.', 'error'); return; }
-
-    const newDoc = { ...authDoc, hash: await sha256(nw), v: 2 };
-    try { await saveAuth(newDoc); }
-    catch (err) { if (!isTimeout(err)) { toast('Erro ao salvar.', 'error'); return; } toast('Salvo localmente — sincronizando...', 'info'); }
-    authDoc = newDoc;
-    $('sec-current').value = $('sec-new').value = $('sec-confirm').value = '';
-    toast('Senha atualizada!', 'success');
+    try {
+      const cred = EmailAuthProvider.credential(currentUser.email, cur);
+      await withTimeout(reauthenticateWithCredential(currentUser, cred), AUTH_TIMEOUT, 'reauth');
+      await withTimeout(updatePassword(currentUser, nw), AUTH_TIMEOUT, 'updatePass');
+      $('sec-current').value = $('sec-new').value = $('sec-confirm').value = '';
+      toast('Senha atualizada!', 'success');
+    } catch (err) {
+      console.error('[Admin] Erro ao trocar senha:', err);
+      toast(authErrorMsg(err), 'error');
+    }
   }, 'Salvando...'));
 
-  $('btn-regen-recovery').addEventListener('click', () => runWithSpinner($('btn-regen-recovery'), async () => {
-    const pass = $('sec-recov-pass').value;
-    if (!authDoc) { toast('Sessão inválida. Recarregue a página.', 'error'); return; }
-    if (await sha256(pass) !== authDoc.hash) { toast('Senha atual incorreta.', 'error'); return; }
-
-    const recovery = genRecoveryCode();
-    const newDoc = { ...authDoc, recoveryHash: await sha256(normalizeRecovery(recovery)), v: 2 };
-    try { await saveAuth(newDoc); }
-    catch (err) { if (!isTimeout(err)) { toast('Erro ao salvar.', 'error'); return; } toast('Salvo localmente — sincronizando...', 'info'); }
-    authDoc = newDoc;
-    $('sec-recov-pass').value = '';
-    $('sec-recovery-code').textContent = recovery;
-    $('sec-recovery-display').classList.remove('hidden');
-    toast('Novo código gerado! Guarde-o.', 'success');
-  }, 'Gerando...'));
-
-  $('btn-copy-sec-recovery').addEventListener('click', () =>
-    copyText($('sec-recovery-code').textContent, $('btn-copy-sec-recovery')));
+  // Enviar link de redefinição para o e-mail logado
+  $('btn-send-reset').addEventListener('click', () => runWithSpinner($('btn-send-reset'), async () => {
+    if (!currentUser?.email) { toast('Sessão expirada.', 'error'); return; }
+    try {
+      await withTimeout(sendPasswordResetEmail(auth, currentUser.email), AUTH_TIMEOUT, 'reset');
+      toast('Link de redefinição enviado para ' + currentUser.email, 'success');
+    } catch (err) {
+      toast(authErrorMsg(err), 'error');
+    }
+  }, 'Enviando...'));
 }
 
 // ── Persist ───────────────────────────────────────────────────────────────────
@@ -534,6 +377,7 @@ async function persist(msg = 'Salvo!') {
     toast(msg, 'success');
   } catch (e) {
     if (isTimeout(e)) toast('Salvo localmente — sincronizando com o servidor...', 'info');
+    else if (String(e?.code).includes('permission-denied')) toast('Sem permissão para salvar. Revise as regras do Firestore.', 'error');
     else toast('Erro ao salvar. Verifique a conexão.', 'error');
   }
 }
@@ -566,8 +410,7 @@ function liveSync() {
 
 function setPreview(on) {
   $('screen-dashboard').classList.toggle('preview-open', on);
-  const btn = $('btn-toggle-preview');
-  btn.classList.toggle('active', on);
+  $('btn-toggle-preview').classList.toggle('active', on);
   if (on) updatePreview();
 }
 function togglePreview() {

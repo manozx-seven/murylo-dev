@@ -1,5 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { initializeFirestore } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { getAuth } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAUvIZVOGQedPuAeHeGv2tBN0jfdebHrCc",
@@ -19,6 +20,10 @@ const app = initializeApp(firebaseConfig);
 export const db = initializeFirestore(app, {
   experimentalAutoDetectLongPolling: true,
 });
+
+// Firebase Authentication (login real por e-mail/senha). A persistência padrão
+// é "local": a sessão sobrevive a reloads e novas abas sem código extra.
+export const auth = getAuth(app);
 
 // Garante que nenhuma operação do Firestore trave a interface para sempre.
 // Se o servidor não responder em `ms`, rejeita com erro "timeout:<label>".

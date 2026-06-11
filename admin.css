@@ -547,6 +547,32 @@ body {
 #screen-auth, #screen-dashboard { animation: screenFade .4s var(--ease-soft) both; }
 @keyframes screenFade { from { opacity: 0; } to { opacity: 1; } }
 
+/* Estado inicial: verificando sessão */
+.auth-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .65rem;
+  padding: 1.5rem 0;
+  color: var(--muted);
+  font-size: .9rem;
+}
+.auth-loading i { color: var(--primary); font-size: 1.1rem; }
+
+/* Card da conta conectada (Segurança) */
+.account-row { display: flex; align-items: center; gap: .85rem; }
+.account-avatar {
+  width: 42px; height: 42px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 1rem;
+  flex-shrink: 0;
+}
+.account-meta { display: flex; flex-direction: column; min-width: 0; }
+.account-meta strong { font-size: .9rem; color: var(--text); word-break: break-all; }
+.account-meta span { font-size: .75rem; color: var(--muted); }
+
 /* ── INPUT COM REVELAR SENHA ──────────────────── */
 .input-wrap { position: relative; display: flex; }
 .input-wrap input { flex: 1; padding-right: 2.6rem; }

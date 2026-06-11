@@ -18,53 +18,24 @@
 <div id="screen-auth">
   <div class="auth-card">
 
-    <!-- First-time setup -->
-    <div id="panel-setup" class="auth-panel hidden">
-      <div class="icon-lock"><i class="fa-solid fa-shield-halved"></i></div>
-      <h1>Configuração Inicial</h1>
-      <p>Defina a senha de administrador para este painel.</p>
-      <form id="form-setup-el" action="javascript:void(0)" autocomplete="on">
-        <div class="form-group">
-          <label>Nova Senha</label>
-          <div class="input-wrap">
-            <input type="password" id="setup-pass" name="new-password" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
-            <button type="button" class="reveal-btn" data-target="setup-pass" title="Mostrar/ocultar"><i class="fa-solid fa-eye"></i></button>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Confirmar Senha</label>
-          <div class="input-wrap">
-            <input type="password" id="setup-confirm" name="confirm-password" placeholder="Repita a senha" autocomplete="new-password">
-            <button type="button" class="reveal-btn" data-target="setup-confirm" title="Mostrar/ocultar"><i class="fa-solid fa-eye"></i></button>
-          </div>
-        </div>
-        <p class="error-msg" id="setup-error"></p>
-        <button type="submit" id="btn-setup" class="btn btn-primary w-full mt-2">Criar Senha</button>
-      </form>
-    </div>
-
-    <!-- Recovery code shown after setup / regenerate -->
-    <div id="panel-recovery" class="auth-panel hidden">
-      <div class="icon-lock"><i class="fa-solid fa-key"></i></div>
-      <h1>Código de Recuperação</h1>
-      <p>Guarde este código em local seguro. É a <strong>única</strong> forma de redefinir a senha caso você a esqueça.</p>
-      <div class="recovery-box">
-        <code id="recovery-code">----</code>
-        <button type="button" id="btn-copy-recovery" class="btn-copy" title="Copiar"><i class="fa-regular fa-copy"></i></button>
+    <!-- Verificando sessão (estado inicial) -->
+    <div id="panel-loading" class="auth-panel">
+      <div class="auth-loading">
+        <i class="fa-solid fa-spinner fa-spin"></i>
+        <span>Verificando sessão...</span>
       </div>
-      <label class="confirm-check">
-        <input type="checkbox" id="recovery-ack">
-        <span>Salvei o código em um local seguro.</span>
-      </label>
-      <button type="button" id="btn-recovery-continue" class="btn btn-primary w-full mt-2" disabled>Continuar</button>
     </div>
 
     <!-- Login -->
     <div id="panel-login" class="auth-panel hidden">
       <div class="icon-lock"><i class="fa-solid fa-lock"></i></div>
       <h1>Painel Admin</h1>
-      <p>Acesso restrito — insira sua senha para continuar.</p>
+      <p>Acesso restrito — entre com sua conta para continuar.</p>
       <form id="form-login-el" action="javascript:void(0)" autocomplete="on">
+        <div class="form-group">
+          <label>E-mail</label>
+          <input type="email" id="login-email" name="email" placeholder="voce@exemplo.com" autocomplete="username">
+        </div>
         <div class="form-group">
           <label>Senha</label>
           <div class="input-wrap">
@@ -75,48 +46,23 @@
         <p class="error-msg" id="login-error"></p>
         <button type="submit" id="btn-login" class="btn btn-primary w-full mt-2">Entrar</button>
       </form>
-      <button id="btn-reset" class="btn-reset-link">Esqueci / redefinir senha</button>
+      <button id="btn-forgot" class="btn-reset-link">Esqueci minha senha</button>
     </div>
 
-    <!-- Reset step 1: recovery code -->
-    <div id="panel-reset" class="auth-panel hidden">
-      <div class="icon-lock"><i class="fa-solid fa-unlock-keyhole"></i></div>
+    <!-- Esqueci a senha -->
+    <div id="panel-forgot" class="auth-panel hidden">
+      <div class="icon-lock"><i class="fa-solid fa-envelope-circle-check"></i></div>
       <h1>Redefinir Senha</h1>
-      <p>Digite o código de recuperação gerado na configuração inicial.</p>
-      <form id="form-reset-el" action="javascript:void(0)">
+      <p>Enviaremos um link de redefinição para o seu e-mail.</p>
+      <form id="form-forgot-el" action="javascript:void(0)" autocomplete="on">
         <div class="form-group">
-          <label>Código de Recuperação</label>
-          <input type="text" id="reset-code" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false">
+          <label>E-mail da conta</label>
+          <input type="email" id="forgot-email" placeholder="voce@exemplo.com" autocomplete="username">
         </div>
-        <p class="error-msg" id="reset-error"></p>
-        <button type="submit" id="btn-reset-verify" class="btn btn-primary w-full mt-2">Verificar Código</button>
+        <p class="error-msg" id="forgot-error"></p>
+        <button type="submit" id="btn-forgot-send" class="btn btn-primary w-full mt-2">Enviar link de redefinição</button>
       </form>
-      <button id="btn-reset-back" class="btn-reset-link">Voltar ao login</button>
-    </div>
-
-    <!-- Reset step 2: new password -->
-    <div id="panel-reset-new" class="auth-panel hidden">
-      <div class="icon-lock"><i class="fa-solid fa-shield-halved"></i></div>
-      <h1>Nova Senha</h1>
-      <p>Código verificado. Defina uma nova senha de administrador.</p>
-      <form id="form-reset-new-el" action="javascript:void(0)" autocomplete="on">
-        <div class="form-group">
-          <label>Nova Senha</label>
-          <div class="input-wrap">
-            <input type="password" id="reset-new-pass" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
-            <button type="button" class="reveal-btn" data-target="reset-new-pass" title="Mostrar/ocultar"><i class="fa-solid fa-eye"></i></button>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Confirmar Senha</label>
-          <div class="input-wrap">
-            <input type="password" id="reset-new-confirm" placeholder="Repita a senha" autocomplete="new-password">
-            <button type="button" class="reveal-btn" data-target="reset-new-confirm" title="Mostrar/ocultar"><i class="fa-solid fa-eye"></i></button>
-          </div>
-        </div>
-        <p class="error-msg" id="reset-new-error"></p>
-        <button type="submit" id="btn-reset-save" class="btn btn-primary w-full mt-2">Salvar Nova Senha</button>
-      </form>
+      <button id="btn-forgot-back" class="btn-reset-link">Voltar ao login</button>
     </div>
 
   </div>
@@ -254,6 +200,18 @@
       <section id="section-seguranca" class="admin-section">
         <h2>Segurança</h2>
 
+        <!-- Conta -->
+        <div class="sec-card">
+          <h3><i class="fa-solid fa-user-shield"></i> Conta conectada</h3>
+          <div class="account-row">
+            <div class="account-avatar"><i class="fa-solid fa-user"></i></div>
+            <div class="account-meta">
+              <strong id="account-email">—</strong>
+              <span>Autenticado via Firebase Authentication</span>
+            </div>
+          </div>
+        </div>
+
         <!-- Alterar senha -->
         <div class="sec-card">
           <h3><i class="fa-solid fa-key"></i> Alterar senha</h3>
@@ -283,44 +241,37 @@
           </button>
         </div>
 
-        <!-- Código de recuperação -->
+        <!-- Redefinir por e-mail -->
         <div class="sec-card">
-          <h3><i class="fa-solid fa-life-ring"></i> Código de recuperação</h3>
-          <p class="sec-desc">Gere um novo código de recuperação caso tenha perdido o atual. O código anterior deixa de funcionar.</p>
-          <div class="form-group">
-            <label>Confirme com a senha atual</label>
-            <div class="input-wrap">
-              <input type="password" id="sec-recov-pass" placeholder="••••••••" autocomplete="current-password">
-              <button type="button" class="reveal-btn" data-target="sec-recov-pass"><i class="fa-solid fa-eye"></i></button>
-            </div>
-          </div>
-          <button id="btn-regen-recovery" class="btn btn-secondary">
-            <i class="fa-solid fa-rotate"></i> Gerar novo código
+          <h3><i class="fa-solid fa-envelope-circle-check"></i> Redefinir por e-mail</h3>
+          <p class="sec-desc">Envie um link de redefinição de senha para o e-mail da sua conta.</p>
+          <button id="btn-send-reset" class="btn btn-secondary">
+            <i class="fa-solid fa-paper-plane"></i> Enviar link de redefinição
           </button>
-          <div id="sec-recovery-display" class="recovery-box hidden" style="margin-top:1rem">
-            <code id="sec-recovery-code">----</code>
-            <button type="button" id="btn-copy-sec-recovery" class="btn-copy" title="Copiar"><i class="fa-regular fa-copy"></i></button>
-          </div>
         </div>
 
         <!-- Dica de segurança -->
         <div class="sec-card sec-tip">
-          <h3><i class="fa-solid fa-triangle-exclamation"></i> Recomendação importante</h3>
-          <p class="sec-desc">Este painel valida a senha no navegador. Para segurança real, restrinja a escrita no banco com regras do Firestore. Regras sugeridas:</p>
+          <h3><i class="fa-solid fa-shield-halved"></i> Regras do Firestore</h3>
+          <p class="sec-desc">Com o login real ativo, restrinja a escrita à sua conta. Cole estas regras no Firebase Console → Firestore → Regras (troque o e-mail pelo da sua conta):</p>
           <pre class="rules-block">rules_version = '2';
 service cloud.firestore {
   match /databases/{db}/documents {
-    // Bio: leitura pública, escrita bloqueada via web
+
+    // Bio: qualquer um lê; só a sua conta escreve
     match /bio/{doc} {
       allow read: if true;
-      allow write: if false;
+      allow write: if request.auth != null
+        &amp;&amp; request.auth.token.email == 'murylo.neves@tjam.jus.br';
     }
+
+    // Coleção antiga de senha não é mais usada
     match /admin/{doc} {
       allow read, write: if false;
     }
   }
 }</pre>
-          <p class="sec-desc">Com isso, edições passam a exigir o Firebase Console / Admin SDK. Para edição pelo painel com segurança total, migre para o <strong>Firebase Authentication</strong>.</p>
+          <p class="sec-desc">Agora o banco só aceita gravações de quem estiver logado com a sua conta — o painel continua salvando normalmente.</p>
         </div>
       </section>
 
