@@ -82,6 +82,7 @@ function authErrorMsg(e) {
   if (c.includes('user-disabled'))     return 'Esta conta foi desativada.';
   if (c.includes('operation-not-allowed')) return 'Login por e-mail/senha não está habilitado no Firebase Console.';
   if (c.includes('configuration-not-found')) return 'Authentication não configurado no Firebase Console.';
+  if (c.includes('unauthorized-domain')) return 'Domínio não autorizado. Adicione-o em Authentication → Settings → Authorized domains.';
   if (c.includes('requires-recent-login')) return 'Por segurança, saia e entre novamente antes de alterar a senha.';
   return 'Não foi possível concluir. Tente novamente.';
 }
