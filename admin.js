@@ -115,15 +115,29 @@ function showScreen(id) {
 }
 
 async function initAuth() {
-  if (hasSession()) { await enterDashboard(); return; }
+  if (hasSession()) {
+    try { await enterDashboard(); return; }
+    catch { clearSession(); }
+  }
 
-  const auth = await loadAuth();
+  let auth = null;
+  try {
+    auth = await loadAuth();
+  } catch (e) {
+    // Firestore indisponível — mostra login com aviso de regras
+    $('login-error').textContent =
+      '⚠️ Erro de conexão com o Firestore. Verifique se as regras do banco estão configuradas para permitir leitura e escrita.';
+    bindLogin(true);
+    showScreen('screen-auth');
+    return;
+  }
+
   if (!auth) {
     $('form-login').classList.add('hidden');
     $('form-setup').classList.remove('hidden');
     bindSetup();
   } else {
-    bindLogin();
+    bindLogin(false);
   }
   showScreen('screen-auth');
 }
@@ -151,25 +165,31 @@ function bindSetup() {
   });
 }
 
-function bindLogin() {
+function bindLogin(firestoreError = false) {
   const doLogin = async () => {
     if (isLocked()) {
-      $('login-error').textContent = `Muitas tentativas. Aguarde 30 minutos.`;
+      $('login-error').textContent = 'Muitas tentativas. Aguarde 30 minutos.';
       return;
     }
-    $('login-error').textContent = '';
     const p = $('login-pass').value;
     if (!p) { $('login-error').textContent = 'Informe a senha.'; return; }
 
     $('btn-login').disabled = true;
-    $('btn-login').textContent = 'Verificando...';
+    $('btn-login').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verificando...';
+    $('login-error').textContent = '';
+
     try {
       const auth = await loadAuth();
+      if (!auth) {
+        $('login-error').textContent = 'Nenhuma senha cadastrada. Recarregue a página.';
+        return;
+      }
       const hash = await sha256(p);
       if (auth.hash === hash) {
         clearFails();
         saveSession();
         await enterDashboard();
+        return; // sucesso — não reabilita o botão (já trocou de tela)
       } else {
         const n = addFail();
         const left = MAX_FAILS - n;
@@ -178,11 +198,14 @@ function bindLogin() {
           : 'Conta bloqueada por 30 minutos.';
         $('login-pass').value = '';
       }
-    } catch {
-      $('login-error').textContent = 'Erro de conexão. Tente novamente.';
+    } catch (e) {
+      $('login-error').textContent =
+        '⚠️ Erro de conexão. Verifique as regras do Firestore e tente novamente.';
+      console.error('[Admin] Erro no login:', e);
     }
+
     $('btn-login').disabled = false;
-    $('btn-login').textContent = 'Entrar';
+    $('btn-login').innerHTML = 'Entrar';
   };
 
   $('btn-login').addEventListener('click', doLogin);
@@ -210,8 +233,14 @@ const DEFAULT_CONFIG = {
 
 async function enterDashboard() {
   showScreen('screen-dashboard');
-  const cfg = await loadConfig();
-  bioConfig = cfg || DEFAULT_CONFIG;
+  try {
+    const cfg = await loadConfig();
+    bioConfig = cfg || DEFAULT_CONFIG;
+  } catch (e) {
+    console.error('[Admin] Erro ao carregar config:', e);
+    toast('Erro ao carregar dados do Firestore. Verifique as regras do banco.', 'error');
+    bioConfig = DEFAULT_CONFIG;
+  }
   populateForms();
   renderLinks();
   renderTags();
