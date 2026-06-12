@@ -25,6 +25,12 @@ button, a, input, textarea, .list-item, .nav-item, .icon-opt, .tag-chip,
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Gate de visibilidade das telas. Precisa de !important porque
+   #screen-auth/#screen-dashboard definem display por seletor de ID
+   (especificidade maior que a classe), e não pode depender do
+   .hidden do Tailwind CDN — se o CDN falhar, o painel vazaria. */
+.hidden { display: none !important; }
+
 body {
   font-family: 'Inter', sans-serif;
   background: var(--bg);
