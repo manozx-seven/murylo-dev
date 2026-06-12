@@ -133,7 +133,18 @@
           <textarea id="field-description" rows="3" placeholder="Descreva o que você faz..."></textarea>
         </div>
         <div class="form-group">
-          <label>Foto <span style="color:#475569;font-weight:400">(nome do arquivo ou URL)</span></label>
+          <label>Foto</label>
+          <div class="photo-row">
+            <img id="photo-thumb" class="photo-thumb" src="murylo.jpg" alt="Foto atual">
+            <div class="photo-actions">
+              <button type="button" id="btn-upload-photo" class="btn btn-secondary">
+                <i class="fa-solid fa-image"></i> Trocar imagem
+              </button>
+              <span class="photo-hint">JPG, PNG ou WebP — redimensionada automaticamente.</span>
+            </div>
+            <input type="file" id="file-photo" accept="image/*" class="hidden">
+          </div>
+          <label style="margin-top:12px">Ou use uma URL <span style="color:#475569;font-weight:400">(deixe vazio para manter a imagem enviada)</span></label>
           <input type="text" id="field-photo" placeholder="murylo.jpg ou https://...">
         </div>
         <button id="btn-save-perfil" class="btn btn-primary">

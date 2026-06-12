@@ -302,6 +302,35 @@ body {
 .toggle input:checked + .toggle-slider { background: var(--primary); }
 .toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
 
+/* ── FOTO (upload com miniatura) ─────────────── */
+.photo-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.photo-thumb {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--border);
+  background: rgba(255,255,255,.04);
+  flex-shrink: 0;
+}
+
+.photo-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: .4rem;
+}
+
+.photo-hint {
+  font-size: .75rem;
+  color: #64748b;
+}
+
 /* ── BUTTONS ─────────────────────────────────── */
 .btn {
   display: inline-flex;

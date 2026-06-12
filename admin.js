@@ -46,6 +46,7 @@ let currentUser = null;
 let inDashboard = false;
 let modalMode = 'link';
 let editingId = null;
+let photoData = null; // imagem enviada (data URL); a URL digitada tem prioridade
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -308,9 +309,48 @@ function populateForms() {
   $('field-name').value        = bioConfig.name;
   $('field-role').value        = bioConfig.role;
   $('field-description').value = bioConfig.description;
-  $('field-photo').value       = bioConfig.photo;
   $('field-status-text').value = bioConfig.statusText;
   $('field-status-active').checked = bioConfig.statusActive;
+
+  // Foto em base64 fica fora do input de URL (seria um texto gigante).
+  const photo = bioConfig.photo || '';
+  if (photo.startsWith('data:image/')) {
+    photoData = photo;
+    $('field-photo').value = '';
+  } else {
+    photoData = null;
+    $('field-photo').value = photo;
+  }
+  updatePhotoThumb();
+}
+
+// ── Foto (upload + compressão) ──────────────────────────────────────────────────
+function getPhotoValue() {
+  return $('field-photo').value.trim() || photoData || '';
+}
+
+function updatePhotoThumb() {
+  const v = getPhotoValue();
+  if (v) $('photo-thumb').src = v;
+}
+
+// Redimensiona para no máx. 512px e converte para JPEG — um avatar vira ~50KB,
+// pequeno o bastante para morar no doc do Firestore (limite 1MB) sem precisar
+// do Firebase Storage (que exige plano pago em projetos novos).
+async function compressImage(file, maxSize = 512, quality = 0.85) {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, maxSize / Math.max(bitmap.width, bitmap.height));
+  const w = Math.max(1, Math.round(bitmap.width * scale));
+  const h = Math.max(1, Math.round(bitmap.height * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff'; // JPEG não tem transparência; evita fundo preto em PNGs
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(bitmap, 0, 0, w, h);
+  bitmap.close();
+  return canvas.toDataURL('image/jpeg', quality);
 }
 
 // ── Navegação de seções ─────────────────────────────────────────────────────────
@@ -355,9 +395,33 @@ function bindDashboard() {
     bioConfig.name        = $('field-name').value.trim();
     bioConfig.role        = $('field-role').value.trim();
     bioConfig.description = $('field-description').value.trim();
-    bioConfig.photo       = $('field-photo').value.trim();
+    bioConfig.photo       = getPhotoValue();
     await persist('Perfil salvo!');
   }, 'Salvando...'));
+
+  // Upload de foto
+  $('btn-upload-photo').addEventListener('click', () => $('file-photo').click());
+  $('file-photo').addEventListener('change', async e => {
+    const file = e.target.files[0];
+    e.target.value = ''; // permite escolher o mesmo arquivo de novo
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { toast('Escolha um arquivo de imagem.', 'error'); return; }
+    await runWithSpinner($('btn-upload-photo'), async () => {
+      try {
+        const dataUrl = await compressImage(file);
+        if (dataUrl.length > 900000) { toast('Imagem grande demais mesmo após compressão.', 'error'); return; }
+        photoData = dataUrl;
+        $('field-photo').value = '';
+        bioConfig.photo = dataUrl;
+        updatePhotoThumb();
+        updatePreview();
+        toast('Imagem carregada — clique em "Salvar Perfil" para aplicar.', 'info');
+      } catch (err) {
+        console.error('[Admin] Erro ao processar imagem:', err);
+        toast('Não foi possível ler esta imagem. Tente JPG ou PNG.', 'error');
+      }
+    }, 'Processando...');
+  });
 
   // Status
   $('btn-save-status').addEventListener('click', () => runWithSpinner($('btn-save-status'), async () => {
@@ -449,9 +513,10 @@ function liveSync() {
   bioConfig.name        = $('field-name').value;
   bioConfig.role        = $('field-role').value;
   bioConfig.description = $('field-description').value;
-  bioConfig.photo       = $('field-photo').value;
+  bioConfig.photo       = getPhotoValue();
   bioConfig.statusText  = $('field-status-text').value;
   bioConfig.statusActive = $('field-status-active').checked;
+  updatePhotoThumb();
   updatePreview();
 }
 
