@@ -7,13 +7,17 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { db, auth, withTimeout, isTimeout } from './firebase.js';
 import {
-  doc, getDoc, setDoc
+  doc, getDoc, setDoc, collection, query, where, limit, getDocs
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import {
   onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
   EmailAuthProvider, reauthenticateWithCredential, updatePassword
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import TEMPLATE from './templates/dev-neon/schema.js';
+
+// Template do usuário logado — carregado dinamicamente conforme o campo
+// `template` do documento da bio dele (multi-cliente: cada bio tem o seu).
+let TEMPLATE = null;
+const DEFAULT_TEMPLATE = 'dev-neon';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 const WRITE_TIMEOUT = 8000;
@@ -50,6 +54,7 @@ const ICONS = [
 
 // ── Estado global ─────────────────────────────────────────────────────────────
 let bioConfig = null;
+let bioSlug = null;        // id do documento da bio do usuário (bios/{slug})
 let currentUser = null;
 let inDashboard = false;
 let modalSection = null;   // seção (do schema) sendo editada no modal
@@ -116,12 +121,51 @@ function toast(msg, type = 'success') {
 }
 
 // ── Firestore (com timeout) ─────────────────────────────────────────────────────
-async function loadConfig() {
-  const snap = await withTimeout(getDoc(doc(db, 'bio', 'config')), READ_TIMEOUT, 'loadConfig');
-  return snap.exists() ? snap.data() : null;
+// Cada cliente é um documento em bios/{slug}: os dados da bio + ownerUid (quem
+// pode editar) + template (qual modelo o painel deve montar).
+async function loadTemplate(id) {
+  const mod = await import(`./templates/${id}/schema.js`);
+  TEMPLATE = mod.default;
+  return TEMPLATE;
 }
+
+// Procura a bio cujo dono é o usuário logado.
+async function resolveBio(user) {
+  const q = query(collection(db, 'bios'), where('ownerUid', '==', user.uid), limit(1));
+  const rs = await withTimeout(getDocs(q), READ_TIMEOUT, 'resolveBio');
+  if (rs.empty) return null;
+  bioSlug = rs.docs[0].id;
+  return rs.docs[0].data();
+}
+
+// Cria a bio do usuário no primeiro acesso. A primeira bio do sistema herda os
+// dados do documento legado bio/config (migração do painel single-user).
+async function createBio(slug) {
+  const ref = doc(db, 'bios', slug);
+  const existing = await withTimeout(getDoc(ref), READ_TIMEOUT, 'slugCheck');
+  if (existing.exists()) throw new Error('slug-taken');
+
+  let seed = null;
+  const any = await withTimeout(getDocs(query(collection(db, 'bios'), limit(1))), READ_TIMEOUT, 'firstBio');
+  if (any.empty) {
+    const legacy = await withTimeout(getDoc(doc(db, 'bio', 'config')), READ_TIMEOUT, 'legacy');
+    if (legacy.exists()) seed = legacy.data();
+  }
+
+  const tpl = await loadTemplate(DEFAULT_TEMPLATE);
+  const cfg = {
+    ...(seed || structuredClone(tpl.defaults)),
+    ownerUid: currentUser.uid,
+    ownerEmail: currentUser.email,
+    template: DEFAULT_TEMPLATE,
+  };
+  await withTimeout(setDoc(ref, cfg), WRITE_TIMEOUT, 'createBio');
+  bioSlug = slug;
+  return cfg;
+}
+
 async function saveConfig(cfg) {
-  await withTimeout(setDoc(doc(db, 'bio', 'config'), cfg), WRITE_TIMEOUT, 'saveConfig');
+  await withTimeout(setDoc(doc(db, 'bios', bioSlug), cfg), WRITE_TIMEOUT, 'saveConfig');
 }
 
 // ── Screens / panels ────────────────────────────────────────────────────────────
@@ -192,8 +236,24 @@ function initAuth() {
       touchSession();
       if (!inDashboard) {
         inDashboard = true;
-        try { await enterDashboard(); }
-        catch (e) { console.error('[Admin] Erro ao abrir dashboard:', e); }
+        try {
+          const cfg = await resolveBio(user);
+          if (cfg) {
+            await enterDashboard(cfg);
+          } else {
+            // Usuário sem bio: primeiro acesso — escolhe o endereço público.
+            inDashboard = false;
+            showScreen('screen-auth');
+            showAuthPanel('panel-setup');
+            $('setup-slug').focus();
+          }
+        } catch (e) {
+          console.error('[Admin] Erro ao abrir dashboard:', e);
+          inDashboard = false;
+          showScreen('screen-auth');
+          showAuthPanel('panel-login');
+          $('login-error').textContent = 'Não foi possível carregar sua bio. Verifique a conexão e recarregue a página.';
+        }
       }
       updateAccountInfo();
     } else {
@@ -275,6 +335,39 @@ function bindAuthHandlers() {
       toast('Se o e-mail existir, enviamos o link de redefinição.', 'success');
       showAuthPanel('panel-login');
     }, 'Enviando...');
+  });
+
+  // Primeiro acesso: criar a bio escolhendo o endereço público (slug)
+  const RESERVED_SLUGS = ['admin', 'index', 'bio', 'bios', 'templates', 'login', 'api'];
+  $('form-setup-el').addEventListener('submit', async e => {
+    e.preventDefault();
+    const slug = $('setup-slug').value.trim().toLowerCase();
+    $('setup-error').textContent = '';
+    if (!/^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$/.test(slug)) {
+      $('setup-error').textContent = 'Use de 3 a 30 caracteres: letras minúsculas, números e hífens.';
+      return;
+    }
+    if (RESERVED_SLUGS.includes(slug)) {
+      $('setup-error').textContent = 'Este endereço é reservado. Escolha outro.';
+      return;
+    }
+    await runWithSpinner($('btn-setup'), async () => {
+      try {
+        const cfg = await createBio(slug);
+        inDashboard = true;
+        await enterDashboard(cfg);
+        toast('Bio criada! Este é o seu painel.', 'success');
+      } catch (err) {
+        console.error('[Admin] Erro ao criar bio:', err);
+        if (String(err?.message) === 'slug-taken') $('setup-error').textContent = 'Este endereço já está em uso. Escolha outro.';
+        else if (isTimeout(err)) $('setup-error').textContent = 'Falha de conexão. Tente novamente.';
+        else if (String(err?.code).includes('permission-denied')) $('setup-error').textContent = 'Sem permissão. Atualize as regras do Firestore (veja a seção Segurança).';
+        else $('setup-error').textContent = 'Não foi possível criar. Tente novamente.';
+      }
+    }, 'Criando...');
+  });
+  $('btn-setup-logout').addEventListener('click', async () => {
+    try { await signOut(auth); } catch { /* onAuthStateChanged trata */ }
   });
 }
 
@@ -451,21 +544,22 @@ function bindImageField(f) {
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 let dashboardBound = false;
 
-async function enterDashboard() {
+async function enterDashboard(cfg) {
+  await loadTemplate(cfg.template || DEFAULT_TEMPLATE);
+  bioConfig = cfg;
   buildUI();
   showScreen('screen-dashboard');
-  try {
-    const cfg = await loadConfig();
-    bioConfig = cfg || structuredClone(TEMPLATE.defaults);
-  } catch (e) {
-    console.error('[Admin] Erro ao carregar config:', e);
-    toast(isTimeout(e) ? 'Conexão lenta — usando dados padrão.' : 'Erro ao carregar dados do Firestore.', 'error');
-    bioConfig = structuredClone(TEMPLATE.defaults);
-  }
   populateForms();
   renderAllLists();
   buildIconPicker();
   if (!dashboardBound) { bindDashboard(); dashboardBound = true; }
+
+  // Preview e "Ver Bio" apontam para a página pública DESTA bio.
+  const pub = `${TEMPLATE.publicPage}?u=${encodeURIComponent(bioSlug)}`;
+  $('btn-view-bio')?.setAttribute('href', pub);
+  const pf = $('preview-frame');
+  if (pf.getAttribute('src') !== pub) { previewReady = false; pf.src = pub; }
+
   updateAccountInfo();
   if (window.innerWidth >= 1100) setPreview(true);
   updatePreview();

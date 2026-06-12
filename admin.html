@@ -49,6 +49,22 @@
       <button id="btn-forgot" class="btn-reset-link">Esqueci minha senha</button>
     </div>
 
+    <!-- Primeiro acesso: escolher o endereço público da bio -->
+    <div id="panel-setup" class="auth-panel hidden">
+      <div class="icon-lock"><i class="fa-solid fa-rocket"></i></div>
+      <h1>Criar sua Bio</h1>
+      <p>Escolha o endereço público da sua página. Use letras minúsculas, números e hífens.</p>
+      <form id="form-setup-el" action="javascript:void(0)">
+        <div class="form-group">
+          <label>Endereço da bio</label>
+          <input type="text" id="setup-slug" placeholder="ex.: ana-studio" autocomplete="off" spellcheck="false">
+        </div>
+        <p class="error-msg" id="setup-error"></p>
+        <button type="submit" id="btn-setup" class="btn btn-primary w-full mt-2">Criar minha bio</button>
+      </form>
+      <button id="btn-setup-logout" class="btn-reset-link">Sair</button>
+    </div>
+
     <!-- Esqueci a senha -->
     <div id="panel-forgot" class="auth-panel hidden">
       <div class="icon-lock"><i class="fa-solid fa-envelope-circle-check"></i></div>
@@ -81,7 +97,7 @@
       <button id="btn-toggle-preview" class="btn btn-secondary" title="Mostrar/ocultar preview">
         <i class="fa-solid fa-eye"></i> <span class="btn-label">Preview</span>
       </button>
-      <a href="index.html" target="_blank" class="btn btn-secondary">
+      <a id="btn-view-bio" href="index.html" target="_blank" class="btn btn-secondary">
         <i class="fa-solid fa-arrow-up-right-from-square"></i> <span class="btn-label">Ver Bio</span>
       </a>
       <button id="btn-logout" class="btn btn-danger">
@@ -161,16 +177,26 @@
         <!-- Dica de segurança -->
         <div class="sec-card sec-tip">
           <h3><i class="fa-solid fa-shield-halved"></i> Regras do Firestore</h3>
-          <p class="sec-desc">Com o login real ativo, restrinja a escrita à sua conta. Cole estas regras no Firebase Console → Firestore → Regras (troque o e-mail pelo da sua conta):</p>
+          <p class="sec-desc">Modelo multi-cliente: cada bio é um documento em <code>bios/{endereço}</code> e só o dono (ownerUid) pode editá-la. Cole estas regras no Firebase Console → Firestore → Regras:</p>
           <pre class="rules-block">rules_version = '2';
 service cloud.firestore {
   match /databases/{db}/documents {
 
-    // Bio: qualquer um lê; só a sua conta escreve
+    // Cada bio: qualquer um lê; só o dono edita
+    match /bios/{slug} {
+      allow get: if true;
+      allow list: if request.auth != null;
+      allow create: if request.auth != null
+        &amp;&amp; request.resource.data.ownerUid == request.auth.uid;
+      allow update, delete: if request.auth != null
+        &amp;&amp; resource.data.ownerUid == request.auth.uid
+        &amp;&amp; request.resource.data.ownerUid == resource.data.ownerUid;
+    }
+
+    // Documento antigo (pré multi-cliente): só leitura, para migração
     match /bio/{doc} {
       allow read: if true;
-      allow write: if request.auth != null
-        &amp;&amp; request.auth.token.email == 'murylo.neves@tjam.jus.br';
+      allow write: if false;
     }
 
     // Coleção antiga de senha não é mais usada
@@ -179,7 +205,7 @@ service cloud.firestore {
     }
   }
 }</pre>
-          <p class="sec-desc">Agora o banco só aceita gravações de quem estiver logado com a sua conta — o painel continua salvando normalmente.</p>
+          <p class="sec-desc">Com isso, um cliente jamais consegue editar a bio de outro — mesmo conhecendo o endereço dela.</p>
         </div>
       </section>
 

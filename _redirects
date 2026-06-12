@@ -1,0 +1,5 @@
+# Netlify: URLs bonitas por cliente — site.com/ana-studio carrega o index.html,
+# e o data-loader.js lê o slug do caminho para buscar bios/ana-studio no Firestore.
+# Arquivos que existem de verdade (admin.html, css, js...) têm prioridade e não
+# passam por aqui.
+/:slug  /index.html  200

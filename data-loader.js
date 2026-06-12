@@ -25,9 +25,26 @@ window.addEventListener('message', e => {
   }
 });
 
+// ── Multi-cliente ──────────────────────────────────────────────────────────────
+// Cada cliente é um documento em bios/{slug}. O slug vem da URL:
+//   site.com/?u=ana-studio   (query string — funciona em qualquer hospedagem)
+//   site.com/ana-studio      (caminho — precisa do rewrite no _redirects)
+// Sem slug na URL, mostra a bio padrão do dono do site (DEFAULT_SLUG).
+const DEFAULT_SLUG = 'murylo';
+
+function detectSlug() {
+  const q = new URLSearchParams(location.search).get('u');
+  if (q) return q.toLowerCase();
+  const last = location.pathname.split('/').filter(Boolean).pop() || '';
+  if (last && !last.includes('.')) return last.toLowerCase();
+  return DEFAULT_SLUG;
+}
+
 (async () => {
   try {
-    const snap = await getDoc(doc(db, 'bio', 'config'));
+    let snap = await getDoc(doc(db, 'bios', detectSlug()));
+    // Fallback: documento legado de antes da migração multi-cliente
+    if (!snap.exists()) snap = await getDoc(doc(db, 'bio', 'config'));
     if (snap.exists() && !livePreview) renderBio(snap.data());
   } catch {
     // Firestore indisponível — mantém defaults já renderizados
