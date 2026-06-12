@@ -11,6 +11,8 @@ import {
 const WRITE_TIMEOUT = 8000;
 const READ_TIMEOUT  = 8000;
 const AUTH_TIMEOUT  = 12000;
+const SESSION_TTL   = 30 * 60 * 1000; // 30 min de inatividade encerra a sessão
+const LAST_ACTIVITY_KEY = 'admin:lastActivity';
 
 const ICONS = [
   { label: 'Site',       cls: 'fa-solid fa-globe' },
@@ -121,15 +123,49 @@ function showAuthPanel(id) {
   });
 }
 
+// ── Sessão por inatividade ──────────────────────────────────────────────────────
+// O Firebase mantém a sessão para sempre (persistência local). Aqui gravamos a
+// última atividade do usuário e, ao recarregar a página, derrubamos a sessão se
+// ficou mais de SESSION_TTL parada — forçando novo login.
+function sessionExpired() {
+  const t = Number(localStorage.getItem(LAST_ACTIVITY_KEY));
+  return t > 0 && Date.now() - t > SESSION_TTL;
+}
+
+function touchSession() {
+  localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now()));
+}
+
+function trackActivity() {
+  let last = 0;
+  const handler = () => {
+    if (!currentUser) return;
+    const now = Date.now();
+    if (now - last < 30000) return; // grava no máximo a cada 30s
+    last = now;
+    touchSession();
+  };
+  ['click', 'keydown', 'pointerdown', 'scroll'].forEach(ev =>
+    document.addEventListener(ev, handler, { passive: true }));
+}
+
 // ── Boot da autenticação ────────────────────────────────────────────────────────
 function initAuth() {
   bindRevealButtons();
   bindAuthHandlers();
+  trackActivity();
 
   // O Firebase restaura a sessão automaticamente (persistência local).
   onAuthStateChanged(auth, async user => {
+    if (user && sessionExpired()) {
+      localStorage.removeItem(LAST_ACTIVITY_KEY);
+      try { await signOut(auth); } catch { /* listener dispara de novo com user=null */ }
+      toast('Sessão expirada por inatividade. Entre novamente.', 'info');
+      return;
+    }
     currentUser = user || null;
     if (user) {
+      touchSession();
       if (!inDashboard) {
         inDashboard = true;
         try { await enterDashboard(); }
@@ -137,6 +173,8 @@ function initAuth() {
       }
       updateAccountInfo();
     } else {
+      // Sem o registro de atividade, um login futuro não seria expirado por engano.
+      localStorage.removeItem(LAST_ACTIVITY_KEY);
       inDashboard = false;
       showScreen('screen-auth');
       showAuthPanel('panel-login');
