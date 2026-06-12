@@ -1,3 +1,10 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// NÚCLEO DO PAINEL — genérico para qualquer template de bio.
+// Nada aqui conhece os campos do modelo: a sidebar, as seções e os formulários
+// são gerados a partir do schema do template (/templates/<id>/schema.js).
+// Para criar um modelo novo de bio: nova pasta em /templates com schema.js,
+// render.js e a página pública — o painel se adapta sozinho.
+// ─────────────────────────────────────────────────────────────────────────────
 import { db, auth, withTimeout, isTimeout } from './firebase.js';
 import {
   doc, getDoc, setDoc
@@ -6,6 +13,7 @@ import {
   onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
   EmailAuthProvider, reauthenticateWithCredential, updatePassword
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import TEMPLATE from './templates/dev-neon/schema.js';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 const WRITE_TIMEOUT = 8000;
@@ -44,9 +52,9 @@ const ICONS = [
 let bioConfig = null;
 let currentUser = null;
 let inDashboard = false;
-let modalMode = 'link';
+let modalSection = null;   // seção (do schema) sendo editada no modal
 let editingId = null;
-let photoData = null; // imagem enviada (data URL); a URL digitada tem prioridade
+const uploadedImages = {}; // data URLs por campo de imagem; URL digitada tem prioridade
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -54,6 +62,13 @@ const $ = id => document.getElementById(id);
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Seções do schema que são formulários simples (têm `fields`)
+const formSections = () => TEMPLATE.sections.filter(s => Array.isArray(s.fields));
 
 // Executa uma ação assíncrona mostrando spinner no botão e bloqueando-o.
 async function runWithSpinner(btn, fn, loadingText = '') {
@@ -263,75 +278,130 @@ function bindAuthHandlers() {
   });
 }
 
-// ── Dashboard ─────────────────────────────────────────────────────────────────
-const DEFAULT_CONFIG = {
-  name: 'Murylo Neves',
-  role: 'Dev Web',
-  description: 'Construindo interfaces limpas, rápidas e escaláveis. Especialista em transformar design em código de alta performance.',
-  photo: 'murylo.jpg',
-  statusText: 'Disponível para projetos',
-  statusActive: true,
-  tags: ['Criação de Sites', 'Landing Pages', 'Sistemas Web'],
-  links: [
-    { id: '1', title: 'Meu Site & Portfólio', subtitle: 'Portfólio e serviços', url: 'https://site-murylo-dev.netlify.app/', icon: 'fa-solid fa-globe', active: true, order: 0 },
-    { id: '2', title: 'LinkedIn', subtitle: 'Conexões profissionais', url: 'https://www.linkedin.com/in/murylo-neves-77053a269', icon: 'fa-brands fa-linkedin-in', active: true, order: 1 },
-    { id: '3', title: 'Fale comigo', subtitle: 'Orçamentos via WhatsApp', url: 'https://wa.me/5592992866146?text=Olá,%20Murylo!', icon: 'fa-brands fa-whatsapp', active: true, order: 2 }
-  ],
-  social: [
-    { id: '1', platform: 'Instagram', handle: '@murylo.dev', url: 'https://instagram.com/murylo.dev', icon: 'fa-brands fa-instagram', active: true }
-  ]
-};
+// ── Geração da UI a partir do schema ────────────────────────────────────────────
+function fieldHtml(f) {
+  const hint = f.hint ? ` <span class="label-hint">(${esc(f.hint)})</span>` : '';
+  const label = `<label>${esc(f.label)}${hint}</label>`;
 
-let dashboardBound = false;
+  if (f.type === 'textarea') return `
+    <div class="form-group">${label}
+      <textarea id="field-${f.key}" rows="${f.rows || 3}" placeholder="${esc(f.placeholder || '')}"></textarea>
+    </div>`;
 
-async function enterDashboard() {
-  showScreen('screen-dashboard');
-  try {
-    const cfg = await loadConfig();
-    bioConfig = cfg || DEFAULT_CONFIG;
-  } catch (e) {
-    console.error('[Admin] Erro ao carregar config:', e);
-    toast(isTimeout(e) ? 'Conexão lenta — usando dados padrão.' : 'Erro ao carregar dados do Firestore.', 'error');
-    bioConfig = DEFAULT_CONFIG;
-  }
-  populateForms();
-  renderLinks();
-  renderTags();
-  renderSocial();
-  buildIconPicker();
-  if (!dashboardBound) { bindDashboard(); dashboardBound = true; }
-  updateAccountInfo();
-  if (window.innerWidth >= 1100) setPreview(true);
-  updatePreview();
+  if (f.type === 'toggle') return `
+    <div class="form-group toggle-group">${label}
+      <label class="toggle">
+        <input type="checkbox" id="field-${f.key}">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>`;
+
+  if (f.type === 'image') return `
+    <div class="form-group">${label}
+      <div class="photo-row">
+        <img id="thumb-${f.key}" class="photo-thumb" alt="Imagem atual">
+        <div class="photo-actions">
+          <button type="button" id="btn-upload-${f.key}" class="btn btn-secondary">
+            <i class="fa-solid fa-image"></i> Trocar imagem
+          </button>
+          <span class="photo-hint">JPG, PNG ou WebP — redimensionada automaticamente.</span>
+        </div>
+        <input type="file" id="file-${f.key}" accept="image/*" class="hidden">
+      </div>
+      <label style="margin-top:12px">Ou use uma URL <span class="label-hint">(deixe vazio para manter a imagem enviada)</span></label>
+      <input type="text" id="field-${f.key}" placeholder="arquivo.jpg ou https://...">
+    </div>`;
+
+  return `
+    <div class="form-group">${label}
+      <input type="text" id="field-${f.key}" placeholder="${esc(f.placeholder || '')}">
+    </div>`;
+}
+
+function sectionHtml(s, active) {
+  const cls = `admin-section${active ? ' active' : ''}`;
+
+  if (Array.isArray(s.fields)) return `
+    <section id="section-${s.id}" class="${cls}">
+      <h2>${esc(s.title || s.label)}</h2>
+      ${s.fields.map(fieldHtml).join('')}
+      <button id="btn-save-${s.id}" class="btn btn-primary">
+        <i class="fa-solid fa-floppy-disk"></i> ${esc(s.saveLabel || 'Salvar')}
+      </button>
+    </section>`;
+
+  if (s.type === 'item-list') return `
+    <section id="section-${s.id}" class="${cls}">
+      <div class="section-header">
+        <h2>${esc(s.title || s.label)}</h2>
+        <button id="btn-add-${s.id}" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Adicionar</button>
+      </div>
+      <div id="list-${s.id}" class="sortable-list"></div>
+    </section>`;
+
+  if (s.type === 'tag-list') return `
+    <section id="section-${s.id}" class="${cls}">
+      <h2>${esc(s.title || s.label)}</h2>
+      <div id="list-${s.id}" class="tags-container"></div>
+      <div class="add-tag-row">
+        <div class="form-group" style="flex:1;margin-bottom:0">
+          <input type="text" id="input-${s.id}" placeholder="Nova tag...">
+        </div>
+        <button id="btn-add-${s.id}" class="btn btn-primary" style="align-self:flex-end">
+          <i class="fa-solid fa-plus"></i>
+        </button>
+      </div>
+    </section>`;
+
+  console.warn(`[Admin] Tipo de seção desconhecido no schema: ${s.type}`);
+  return '';
+}
+
+let uiBuilt = false;
+function buildUI() {
+  if (uiBuilt) return;
+  uiBuilt = true;
+  // Seções do schema entram antes das fixas do núcleo (Segurança).
+  document.querySelector('.admin-sidebar').insertAdjacentHTML('afterbegin',
+    TEMPLATE.sections.map((s, i) =>
+      `<button class="nav-item${i === 0 ? ' active' : ''}" data-section="${s.id}"><i class="${s.icon}"></i> ${esc(s.label)}</button>`
+    ).join(''));
+  document.querySelector('.admin-main').insertAdjacentHTML('afterbegin',
+    TEMPLATE.sections.map((s, i) => sectionHtml(s, i === 0)).join(''));
+}
+
+// ── Leitura/escrita genérica de campos ──────────────────────────────────────────
+function readField(f, trim = false) {
+  if (f.type === 'toggle') return $(`field-${f.key}`).checked;
+  if (f.type === 'image')  return imageValue(f.key);
+  const v = $(`field-${f.key}`).value;
+  return trim ? v.trim() : v;
 }
 
 function populateForms() {
-  $('field-name').value        = bioConfig.name;
-  $('field-role').value        = bioConfig.role;
-  $('field-description').value = bioConfig.description;
-  $('field-status-text').value = bioConfig.statusText;
-  $('field-status-active').checked = bioConfig.statusActive;
-
-  // Foto em base64 fica fora do input de URL (seria um texto gigante).
-  const photo = bioConfig.photo || '';
-  if (photo.startsWith('data:image/')) {
-    photoData = photo;
-    $('field-photo').value = '';
-  } else {
-    photoData = null;
-    $('field-photo').value = photo;
-  }
-  updatePhotoThumb();
+  formSections().forEach(s => s.fields.forEach(f => {
+    const v = bioConfig[f.key];
+    if (f.type === 'toggle') { $(`field-${f.key}`).checked = !!v; return; }
+    if (f.type === 'image') {
+      // Imagem em base64 fica fora do input de URL (seria um texto gigante).
+      const val = v || '';
+      if (val.startsWith('data:image/')) { uploadedImages[f.key] = val; $(`field-${f.key}`).value = ''; }
+      else { delete uploadedImages[f.key]; $(`field-${f.key}`).value = val; }
+      updateThumb(f.key);
+      return;
+    }
+    $(`field-${f.key}`).value = v ?? '';
+  }));
 }
 
-// ── Foto (upload + compressão) ──────────────────────────────────────────────────
-function getPhotoValue() {
-  return $('field-photo').value.trim() || photoData || '';
+// ── Imagem (upload + compressão) ────────────────────────────────────────────────
+function imageValue(key) {
+  return $(`field-${key}`).value.trim() || uploadedImages[key] || '';
 }
 
-function updatePhotoThumb() {
-  const v = getPhotoValue();
-  if (v) $('photo-thumb').src = v;
+function updateThumb(key) {
+  const v = imageValue(key);
+  if (v) $(`thumb-${key}`).src = v;
 }
 
 // Redimensiona para no máx. 512px e converte para JPEG — um avatar vira ~50KB,
@@ -353,7 +423,62 @@ async function compressImage(file, maxSize = 512, quality = 0.85) {
   return canvas.toDataURL('image/jpeg', quality);
 }
 
-// ── Navegação de seções ─────────────────────────────────────────────────────────
+function bindImageField(f) {
+  $(`btn-upload-${f.key}`).addEventListener('click', () => $(`file-${f.key}`).click());
+  $(`file-${f.key}`).addEventListener('change', async e => {
+    const file = e.target.files[0];
+    e.target.value = ''; // permite escolher o mesmo arquivo de novo
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { toast('Escolha um arquivo de imagem.', 'error'); return; }
+    await runWithSpinner($(`btn-upload-${f.key}`), async () => {
+      try {
+        const dataUrl = await compressImage(file);
+        if (dataUrl.length > 900000) { toast('Imagem grande demais mesmo após compressão.', 'error'); return; }
+        uploadedImages[f.key] = dataUrl;
+        $(`field-${f.key}`).value = '';
+        bioConfig[f.key] = dataUrl;
+        updateThumb(f.key);
+        updatePreview();
+        toast('Imagem carregada — clique em salvar para aplicar.', 'info');
+      } catch (err) {
+        console.error('[Admin] Erro ao processar imagem:', err);
+        toast('Não foi possível ler esta imagem. Tente JPG ou PNG.', 'error');
+      }
+    }, 'Processando...');
+  });
+}
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+let dashboardBound = false;
+
+async function enterDashboard() {
+  buildUI();
+  showScreen('screen-dashboard');
+  try {
+    const cfg = await loadConfig();
+    bioConfig = cfg || structuredClone(TEMPLATE.defaults);
+  } catch (e) {
+    console.error('[Admin] Erro ao carregar config:', e);
+    toast(isTimeout(e) ? 'Conexão lenta — usando dados padrão.' : 'Erro ao carregar dados do Firestore.', 'error');
+    bioConfig = structuredClone(TEMPLATE.defaults);
+  }
+  populateForms();
+  renderAllLists();
+  buildIconPicker();
+  if (!dashboardBound) { bindDashboard(); dashboardBound = true; }
+  updateAccountInfo();
+  if (window.innerWidth >= 1100) setPreview(true);
+  updatePreview();
+}
+
+function renderAllLists() {
+  TEMPLATE.sections.forEach(s => {
+    if (s.type === 'item-list') renderItemList(s);
+    else if (s.type === 'tag-list') renderTagList(s);
+  });
+}
+
+// ── Bind do dashboard (uma única vez) ───────────────────────────────────────────
 function bindDashboard() {
   document.querySelectorAll('.nav-item').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -384,57 +509,30 @@ function bindDashboard() {
     if (pf.contentDocument && pf.contentDocument.readyState === 'complete') previewReady = true;
   } catch { /* mesma origem; ignora */ }
 
-  // Live sync perfil + status -> preview
-  ['field-name', 'field-role', 'field-description', 'field-photo', 'field-status-text'].forEach(id => {
-    $(id).addEventListener('input', liveSync);
-  });
-  $('field-status-active').addEventListener('change', liveSync);
-
-  // Perfil
-  $('btn-save-perfil').addEventListener('click', () => runWithSpinner($('btn-save-perfil'), async () => {
-    bioConfig.name        = $('field-name').value.trim();
-    bioConfig.role        = $('field-role').value.trim();
-    bioConfig.description = $('field-description').value.trim();
-    bioConfig.photo       = getPhotoValue();
-    await persist('Perfil salvo!');
-  }, 'Salvando...'));
-
-  // Upload de foto
-  $('btn-upload-photo').addEventListener('click', () => $('file-photo').click());
-  $('file-photo').addEventListener('change', async e => {
-    const file = e.target.files[0];
-    e.target.value = ''; // permite escolher o mesmo arquivo de novo
-    if (!file) return;
-    if (!file.type.startsWith('image/')) { toast('Escolha um arquivo de imagem.', 'error'); return; }
-    await runWithSpinner($('btn-upload-photo'), async () => {
-      try {
-        const dataUrl = await compressImage(file);
-        if (dataUrl.length > 900000) { toast('Imagem grande demais mesmo após compressão.', 'error'); return; }
-        photoData = dataUrl;
-        $('field-photo').value = '';
-        bioConfig.photo = dataUrl;
-        updatePhotoThumb();
-        updatePreview();
-        toast('Imagem carregada — clique em "Salvar Perfil" para aplicar.', 'info');
-      } catch (err) {
-        console.error('[Admin] Erro ao processar imagem:', err);
-        toast('Não foi possível ler esta imagem. Tente JPG ou PNG.', 'error');
-      }
-    }, 'Processando...');
+  // Campos dos formulários: live preview + botão de salvar por seção
+  formSections().forEach(s => {
+    s.fields.forEach(f => {
+      const el = $(`field-${f.key}`);
+      el.addEventListener(f.type === 'toggle' ? 'change' : 'input', liveSync);
+      if (f.type === 'image') bindImageField(f);
+    });
+    $(`btn-save-${s.id}`).addEventListener('click', () => runWithSpinner($(`btn-save-${s.id}`), async () => {
+      s.fields.forEach(f => { bioConfig[f.key] = readField(f, true); });
+      await persist(`${s.label} salvo!`);
+    }, 'Salvando...'));
   });
 
-  // Status
-  $('btn-save-status').addEventListener('click', () => runWithSpinner($('btn-save-status'), async () => {
-    bioConfig.statusText   = $('field-status-text').value.trim();
-    bioConfig.statusActive = $('field-status-active').checked;
-    await persist('Status salvo!');
-  }, 'Salvando...'));
-
-  // Links / Tags / Social
-  $('btn-add-link').addEventListener('click', () => openModal('link', null));
-  $('btn-add-tag').addEventListener('click', () => runWithSpinner($('btn-add-tag'), addTag));
-  $('new-tag-input').addEventListener('keydown', e => { if (e.key === 'Enter') runWithSpinner($('btn-add-tag'), addTag); });
-  $('btn-add-social').addEventListener('click', () => openModal('social', null));
+  // Listas: botões de adicionar
+  TEMPLATE.sections.forEach(s => {
+    if (s.type === 'item-list') {
+      $(`btn-add-${s.id}`).addEventListener('click', () => openModal(s, null));
+    } else if (s.type === 'tag-list') {
+      $(`btn-add-${s.id}`).addEventListener('click', () => runWithSpinner($(`btn-add-${s.id}`), () => addTag(s)));
+      $(`input-${s.id}`).addEventListener('keydown', e => {
+        if (e.key === 'Enter') runWithSpinner($(`btn-add-${s.id}`), () => addTag(s));
+      });
+    }
+  });
 
   // Modal
   $('modal-close').addEventListener('click', closeModal);
@@ -510,13 +608,10 @@ function updatePreview() {
 
 function liveSync() {
   if (!bioConfig) return;
-  bioConfig.name        = $('field-name').value;
-  bioConfig.role        = $('field-role').value;
-  bioConfig.description = $('field-description').value;
-  bioConfig.photo       = getPhotoValue();
-  bioConfig.statusText  = $('field-status-text').value;
-  bioConfig.statusActive = $('field-status-active').checked;
-  updatePhotoThumb();
+  formSections().forEach(s => s.fields.forEach(f => {
+    bioConfig[f.key] = readField(f);
+    if (f.type === 'image') updateThumb(f.key);
+  }));
   updatePreview();
 }
 
@@ -529,156 +624,108 @@ function togglePreview() {
   setPreview(!$('screen-dashboard').classList.contains('preview-open'));
 }
 
-// ── Links ─────────────────────────────────────────────────────────────────────
-function renderLinks() {
-  const list = $('links-list');
-  const sorted = [...bioConfig.links].sort((a, b) => a.order - b.order);
-  list.innerHTML = sorted.map(link => `
-    <div class="list-item" draggable="true" data-id="${link.id}">
-      <span class="drag-handle"><i class="fa-solid fa-grip-vertical"></i></span>
-      <div class="list-item-icon"><i class="${link.icon}"></i></div>
+// ── Listas de itens (links, redes sociais, ...) ─────────────────────────────────
+function renderItemList(s) {
+  const list = $(`list-${s.id}`);
+  const items = s.sortable
+    ? [...bioConfig[s.key]].sort((a, b) => a.order - b.order)
+    : bioConfig[s.key];
+
+  list.innerHTML = items.map(item => `
+    <div class="list-item" ${s.sortable ? 'draggable="true"' : ''} data-id="${item.id}">
+      ${s.sortable ? '<span class="drag-handle"><i class="fa-solid fa-grip-vertical"></i></span>' : ''}
+      <div class="list-item-icon"><i class="${item.icon}"></i></div>
       <div class="list-item-info">
-        <strong>${link.title}</strong>
-        <span>${link.subtitle}</span>
+        <strong>${esc(item[s.titleKey] || '')}</strong>
+        <span>${esc(item[s.subKey] || '')}</span>
       </div>
       <div class="list-item-actions">
         <label class="toggle" title="Ativar/desativar">
-          <input type="checkbox" class="link-toggle" data-id="${link.id}" ${link.active ? 'checked' : ''}>
+          <input type="checkbox" class="item-toggle" data-id="${item.id}" ${item.active ? 'checked' : ''}>
           <span class="toggle-slider"></span>
         </label>
-        <button class="btn-icon btn-icon-edit link-edit" data-id="${link.id}" title="Editar">
+        <button class="btn-icon btn-icon-edit item-edit" data-id="${item.id}" title="Editar">
           <i class="fa-solid fa-pen"></i>
         </button>
-        <button class="btn-icon btn-icon-delete link-delete" data-id="${link.id}" title="Remover">
+        <button class="btn-icon btn-icon-delete item-delete" data-id="${item.id}" title="Remover">
           <i class="fa-solid fa-trash"></i>
         </button>
       </div>
     </div>`
   ).join('');
 
-  list.querySelectorAll('.link-toggle').forEach(cb => {
+  list.querySelectorAll('.item-toggle').forEach(cb => {
     cb.addEventListener('change', async () => {
-      const link = bioConfig.links.find(l => l.id === cb.dataset.id);
-      if (link) { link.active = cb.checked; await persist(); }
+      const it = bioConfig[s.key].find(x => x.id === cb.dataset.id);
+      if (it) { it.active = cb.checked; await persist(); }
     });
   });
 
-  list.querySelectorAll('.link-edit').forEach(btn => {
+  list.querySelectorAll('.item-edit').forEach(btn => {
     btn.addEventListener('click', () => {
-      const link = bioConfig.links.find(l => l.id === btn.dataset.id);
-      if (link) openModal('link', link);
+      const it = bioConfig[s.key].find(x => x.id === btn.dataset.id);
+      if (it) openModal(s, it);
     });
   });
 
-  list.querySelectorAll('.link-delete').forEach(btn => {
+  list.querySelectorAll('.item-delete').forEach(btn => {
     btn.addEventListener('click', () => {
-      if (!confirm('Remover este link?')) return;
+      if (!confirm(`Remover ${s.itemName.toLowerCase()}?`)) return;
       runWithSpinner(btn, async () => {
-        bioConfig.links = bioConfig.links.filter(l => l.id !== btn.dataset.id);
-        renderLinks();
-        await persist('Link removido.');
+        bioConfig[s.key] = bioConfig[s.key].filter(x => x.id !== btn.dataset.id);
+        renderItemList(s);
+        await persist(`${s.itemName} removido.`);
       });
     });
   });
 
-  bindDrag(list, 'links');
+  if (s.sortable) bindDrag(list, s);
 }
 
 // ── Tags ──────────────────────────────────────────────────────────────────────
-function renderTags() {
-  const container = $('tags-list');
-  container.innerHTML = bioConfig.tags.map((tag, i) => `
+function renderTagList(s) {
+  const container = $(`list-${s.id}`);
+  container.innerHTML = (bioConfig[s.key] || []).map((tag, i) => `
     <span class="tag-chip">
-      ${tag}
+      ${esc(tag)}
       <button data-i="${i}" title="Remover"><i class="fa-solid fa-xmark"></i></button>
     </span>`
   ).join('');
 
   container.querySelectorAll('button').forEach(btn => {
     btn.addEventListener('click', async () => {
-      bioConfig.tags.splice(Number(btn.dataset.i), 1);
-      renderTags();
+      bioConfig[s.key].splice(Number(btn.dataset.i), 1);
+      renderTagList(s);
       await persist('Tag removida.');
     });
   });
 }
 
-async function addTag() {
-  const input = $('new-tag-input');
+async function addTag(s) {
+  const input = $(`input-${s.id}`);
   const val = input.value.trim();
   if (!val) return;
-  bioConfig.tags.push(val);
+  bioConfig[s.key].push(val);
   input.value = '';
-  renderTags();
+  renderTagList(s);
   await persist('Tag adicionada.');
 }
 
-// ── Social ────────────────────────────────────────────────────────────────────
-function renderSocial() {
-  const list = $('social-list');
-  list.innerHTML = bioConfig.social.map(s => `
-    <div class="list-item" data-id="${s.id}">
-      <div class="list-item-icon"><i class="${s.icon}"></i></div>
-      <div class="list-item-info">
-        <strong>${s.platform}</strong>
-        <span>${s.handle}</span>
-      </div>
-      <div class="list-item-actions">
-        <label class="toggle" title="Ativar/desativar">
-          <input type="checkbox" class="social-toggle" data-id="${s.id}" ${s.active ? 'checked' : ''}>
-          <span class="toggle-slider"></span>
-        </label>
-        <button class="btn-icon btn-icon-edit social-edit" data-id="${s.id}" title="Editar">
-          <i class="fa-solid fa-pen"></i>
-        </button>
-        <button class="btn-icon btn-icon-delete social-delete" data-id="${s.id}" title="Remover">
-          <i class="fa-solid fa-trash"></i>
-        </button>
-      </div>
-    </div>`
-  ).join('');
-
-  list.querySelectorAll('.social-toggle').forEach(cb => {
-    cb.addEventListener('change', async () => {
-      const s = bioConfig.social.find(x => x.id === cb.dataset.id);
-      if (s) { s.active = cb.checked; await persist(); }
-    });
-  });
-
-  list.querySelectorAll('.social-edit').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const s = bioConfig.social.find(x => x.id === btn.dataset.id);
-      if (s) openModal('social', s);
-    });
-  });
-
-  list.querySelectorAll('.social-delete').forEach(btn => {
-    btn.addEventListener('click', () => {
-      if (!confirm('Remover esta rede social?')) return;
-      runWithSpinner(btn, async () => {
-        bioConfig.social = bioConfig.social.filter(x => x.id !== btn.dataset.id);
-        renderSocial();
-        await persist('Rede social removida.');
-      });
-    });
-  });
-}
-
 // ── Modal ─────────────────────────────────────────────────────────────────────
-function openModal(mode, data) {
-  modalMode = mode;
+function openModal(s, data) {
+  modalSection = s;
   editingId = data?.id || null;
 
-  $('modal-title').textContent    = data ? `Editar ${mode === 'link' ? 'Link' : 'Rede Social'}` : `Adicionar ${mode === 'link' ? 'Link' : 'Rede Social'}`;
-  $('modal-field-title').value    = data?.title    || data?.platform || '';
+  $('modal-title').textContent    = `${data ? 'Editar' : 'Adicionar'} ${s.itemName}`;
+  $('modal-field-title').value    = data?.[s.titleKey] || '';
   $('modal-field-subtitle').value = data?.subtitle || '';
   $('modal-field-handle').value   = data?.handle   || '';
   $('modal-field-url').value      = data?.url      || '';
   $('modal-field-icon').value     = data?.icon     || '';
   $('modal-field-active').checked = data?.active !== false;
 
-  $('modal-group-subtitle').style.display = mode === 'link'   ? '' : 'none';
-  $('modal-group-handle').style.display   = mode === 'social' ? '' : 'none';
+  $('modal-group-subtitle').style.display = s.modal?.subtitle ? '' : 'none';
+  $('modal-group-handle').style.display   = s.modal?.handle   ? '' : 'none';
 
   syncIconPicker(data?.icon || '');
   const ov = $('modal-overlay');
@@ -690,36 +737,29 @@ function openModal(mode, data) {
 function closeModal() { $('modal-overlay').classList.add('hidden'); }
 
 async function saveModal() {
-  const title  = $('modal-field-title').value.trim();
-  const url    = $('modal-field-url').value.trim();
-  const icon   = $('modal-field-icon').value.trim() || 'fa-solid fa-link';
+  const s = modalSection;
+  if (!s) return;
+  const title = $('modal-field-title').value.trim();
+  const url   = $('modal-field-url').value.trim();
+  const icon  = $('modal-field-icon').value.trim() || 'fa-solid fa-link';
 
   if (!title || !url) { toast('Título e URL são obrigatórios.', 'error'); return; }
 
-  if (modalMode === 'link') {
-    const subtitle = $('modal-field-subtitle').value.trim();
-    const active   = $('modal-field-active').checked;
-    if (editingId) {
-      const link = bioConfig.links.find(l => l.id === editingId);
-      if (link) Object.assign(link, { title, subtitle, url, icon, active });
-    } else {
-      const maxOrder = bioConfig.links.reduce((m, l) => Math.max(m, l.order), -1);
-      bioConfig.links.push({ id: uid(), title, subtitle, url, icon, active, order: maxOrder + 1 });
-    }
-    renderLinks();
+  const item = { [s.titleKey]: title, url, icon, active: $('modal-field-active').checked };
+  if (s.modal?.subtitle) item.subtitle = $('modal-field-subtitle').value.trim();
+  if (s.modal?.handle)   item.handle   = $('modal-field-handle').value.trim();
+
+  const arr = bioConfig[s.key];
+  if (editingId) {
+    const it = arr.find(x => x.id === editingId);
+    if (it) Object.assign(it, item);
   } else {
-    const platform = title;
-    const handle   = $('modal-field-handle').value.trim();
-    const active   = $('modal-field-active').checked;
-    if (editingId) {
-      const s = bioConfig.social.find(x => x.id === editingId);
-      if (s) Object.assign(s, { platform, handle, url, icon, active });
-    } else {
-      bioConfig.social.push({ id: uid(), platform, handle, url, icon, active });
-    }
-    renderSocial();
+    const novo = { id: uid(), ...item };
+    if (s.sortable) novo.order = arr.reduce((m, x) => Math.max(m, x.order ?? -1), -1) + 1;
+    arr.push(novo);
   }
 
+  renderItemList(s);
   closeModal();
   await persist('Salvo com sucesso!');
 }
@@ -747,8 +787,8 @@ function syncIconPicker(cls) {
   });
 }
 
-// ── Drag to reorder (links only) ──────────────────────────────────────────────
-function bindDrag(list, type) {
+// ── Drag to reorder ───────────────────────────────────────────────────────────
+function bindDrag(list, s) {
   let dragId = null;
 
   list.querySelectorAll('.list-item').forEach(item => {
@@ -773,14 +813,14 @@ function bindDrag(list, type) {
       const targetId = item.dataset.id;
       if (!dragId || dragId === targetId) return;
 
-      const arr = bioConfig[type];
+      const arr = bioConfig[s.key];
       const from = arr.findIndex(x => x.id === dragId);
       const to   = arr.findIndex(x => x.id === targetId);
       const [moved] = arr.splice(from, 1);
       arr.splice(to, 0, moved);
       arr.forEach((x, i) => { if ('order' in x) x.order = i; });
 
-      if (type === 'links') renderLinks();
+      renderItemList(s);
       await persist('Ordem atualizada.');
     });
   });

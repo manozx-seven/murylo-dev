@@ -92,122 +92,19 @@
 
   <div class="admin-body">
 
-    <!-- Sidebar -->
+    <!-- Sidebar — as seções do template são geradas pelo JS a partir do schema;
+         aqui ficam apenas as fixas do núcleo. -->
     <nav class="admin-sidebar">
-      <button class="nav-item active" data-section="perfil">
-        <i class="fa-solid fa-user"></i> Perfil
-      </button>
-      <button class="nav-item" data-section="status">
-        <i class="fa-solid fa-circle-dot"></i> Status
-      </button>
-      <button class="nav-item" data-section="links">
-        <i class="fa-solid fa-link"></i> Links
-      </button>
-      <button class="nav-item" data-section="tags">
-        <i class="fa-solid fa-tags"></i> Tags
-      </button>
-      <button class="nav-item" data-section="social">
-        <i class="fa-solid fa-share-nodes"></i> Redes Sociais
-      </button>
       <button class="nav-item" data-section="seguranca">
         <i class="fa-solid fa-shield-halved"></i> Segurança
       </button>
     </nav>
 
-    <!-- Main content -->
+    <!-- Main content — as seções do template são geradas pelo JS a partir do
+         schema e inseridas antes das fixas do núcleo. -->
     <main class="admin-main">
 
-      <!-- ── Perfil ── -->
-      <section id="section-perfil" class="admin-section active">
-        <h2>Perfil</h2>
-        <div class="form-group">
-          <label>Nome</label>
-          <input type="text" id="field-name" placeholder="Seu nome completo">
-        </div>
-        <div class="form-group">
-          <label>Função <span style="color:#475569;font-weight:400">(aparece como &lt;Função/&gt;)</span></label>
-          <input type="text" id="field-role" placeholder="Dev Web">
-        </div>
-        <div class="form-group">
-          <label>Descrição</label>
-          <textarea id="field-description" rows="3" placeholder="Descreva o que você faz..."></textarea>
-        </div>
-        <div class="form-group">
-          <label>Foto</label>
-          <div class="photo-row">
-            <img id="photo-thumb" class="photo-thumb" src="murylo.jpg" alt="Foto atual">
-            <div class="photo-actions">
-              <button type="button" id="btn-upload-photo" class="btn btn-secondary">
-                <i class="fa-solid fa-image"></i> Trocar imagem
-              </button>
-              <span class="photo-hint">JPG, PNG ou WebP — redimensionada automaticamente.</span>
-            </div>
-            <input type="file" id="file-photo" accept="image/*" class="hidden">
-          </div>
-          <label style="margin-top:12px">Ou use uma URL <span style="color:#475569;font-weight:400">(deixe vazio para manter a imagem enviada)</span></label>
-          <input type="text" id="field-photo" placeholder="murylo.jpg ou https://...">
-        </div>
-        <button id="btn-save-perfil" class="btn btn-primary">
-          <i class="fa-solid fa-floppy-disk"></i> Salvar Perfil
-        </button>
-      </section>
-
-      <!-- ── Status ── -->
-      <section id="section-status" class="admin-section">
-        <h2>Status</h2>
-        <div class="form-group">
-          <label>Texto do Badge</label>
-          <input type="text" id="field-status-text" placeholder="Disponível para projetos">
-        </div>
-        <div class="form-group toggle-group">
-          <label>Exibir badge de status</label>
-          <label class="toggle">
-            <input type="checkbox" id="field-status-active">
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-        <button id="btn-save-status" class="btn btn-primary">
-          <i class="fa-solid fa-floppy-disk"></i> Salvar Status
-        </button>
-      </section>
-
-      <!-- ── Links ── -->
-      <section id="section-links" class="admin-section">
-        <div class="section-header">
-          <h2>Links</h2>
-          <button id="btn-add-link" class="btn btn-primary">
-            <i class="fa-solid fa-plus"></i> Adicionar
-          </button>
-        </div>
-        <div id="links-list" class="sortable-list"></div>
-      </section>
-
-      <!-- ── Tags ── -->
-      <section id="section-tags" class="admin-section">
-        <h2>Tags de Serviços</h2>
-        <div id="tags-list" class="tags-container"></div>
-        <div class="add-tag-row">
-          <div class="form-group" style="flex:1;margin-bottom:0">
-            <input type="text" id="new-tag-input" placeholder="Nova tag...">
-          </div>
-          <button id="btn-add-tag" class="btn btn-primary" style="align-self:flex-end">
-            <i class="fa-solid fa-plus"></i>
-          </button>
-        </div>
-      </section>
-
-      <!-- ── Redes Sociais ── -->
-      <section id="section-social" class="admin-section">
-        <div class="section-header">
-          <h2>Redes Sociais</h2>
-          <button id="btn-add-social" class="btn btn-primary">
-            <i class="fa-solid fa-plus"></i> Adicionar
-          </button>
-        </div>
-        <div id="social-list" class="sortable-list"></div>
-      </section>
-
-      <!-- ── Segurança ── -->
+      <!-- ── Segurança (núcleo) ── -->
       <section id="section-seguranca" class="admin-section">
         <h2>Segurança</h2>
 

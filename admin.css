@@ -302,6 +302,9 @@ body {
 .toggle input:checked + .toggle-slider { background: var(--primary); }
 .toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
 
+/* Texto auxiliar ao lado do label dos campos gerados pelo schema */
+.label-hint { color: #475569; font-weight: 400; }
+
 /* ── FOTO (upload com miniatura) ─────────────── */
 .photo-row {
   display: flex;
