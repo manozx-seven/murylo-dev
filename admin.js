@@ -147,6 +147,14 @@ function trackActivity() {
   };
   ['click', 'keydown', 'pointerdown', 'scroll'].forEach(ev =>
     document.addEventListener(ev, handler, { passive: true }));
+
+  // Expira também com a aba aberta: checa a cada minuto se passou do TTL.
+  setInterval(async () => {
+    if (!currentUser || !sessionExpired()) return;
+    localStorage.removeItem(LAST_ACTIVITY_KEY);
+    try { await signOut(auth); } catch { /* listener trata */ }
+    toast('Sessão expirada por inatividade. Entre novamente.', 'info');
+  }, 60000);
 }
 
 // ── Boot da autenticação ────────────────────────────────────────────────────────
