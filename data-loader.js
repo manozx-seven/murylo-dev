@@ -30,7 +30,7 @@ window.addEventListener('message', e => {
 //   site.com/?u=ana-studio   (query string — funciona em qualquer hospedagem)
 //   site.com/ana-studio      (caminho — precisa do rewrite no _redirects)
 // Sem slug na URL, mostra a bio padrão do dono do site (DEFAULT_SLUG).
-const DEFAULT_SLUG = 'murylo';
+const DEFAULT_SLUG = 'murylo-bio';
 
 function detectSlug() {
   const q = new URLSearchParams(location.search).get('u');
