@@ -3,12 +3,12 @@ import { initializeFirestore } from 'https://www.gstatic.com/firebasejs/10.12.2/
 import { getAuth } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAUvIZVOGQedPuAeHeGv2tBN0jfdebHrCc",
-  authDomain: "painel-admin-murylo-bio.firebaseapp.com",
-  projectId: "painel-admin-murylo-bio",
-  storageBucket: "painel-admin-murylo-bio.firebasestorage.app",
-  messagingSenderId: "497494776604",
-  appId: "1:497494776604:web:982de5f354b145a61eb8d9"
+  apiKey: "AIzaSyCr83rXRbphXAZ3VWVeDSM_UJ5-TsUY_xQ",
+  authDomain: "painel-admin-bio.firebaseapp.com",
+  projectId: "painel-admin-bio",
+  storageBucket: "painel-admin-bio.firebasestorage.app",
+  messagingSenderId: "371618139088",
+  appId: "1:371618139088:web:ce4f1bd686f9295cdb87d5"
 };
 
 const app = initializeApp(firebaseConfig);
