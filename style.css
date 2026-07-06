@@ -24,6 +24,32 @@ body {
 }
 
 /* ---------------------------------------------------
+   LOADER: esconde o conteúdo até o data-loader aplicar
+   os dados reais do Firestore (evita o flash de conteúdo
+   antigo/padrão). Enquanto <body> tem .bio-loading, o
+   conteúdo fica invisível e o spinner aparece.
+   --------------------------------------------------- */
+main, footer { transition: opacity .3s ease; }
+body.bio-loading main,
+body.bio-loading footer { opacity: 0; }
+
+.bio-loader {
+    position: fixed; inset: 0; z-index: 50;
+    display: flex; align-items: center; justify-content: center;
+}
+body:not(.bio-loading) .bio-loader {
+    opacity: 0; visibility: hidden;
+    transition: opacity .3s ease, visibility .3s ease;
+}
+.bio-loader .spinner {
+    width: 34px; height: 34px; border-radius: 50%;
+    border: 3px solid rgba(255,255,255,.12);
+    border-top-color: rgba(56,189,248,.9);
+    animation: bio-spin .7s linear infinite;
+}
+@keyframes bio-spin { to { transform: rotate(360deg); } }
+
+/* ---------------------------------------------------
    GLASSMORPHISM ESCURO: Transparência e Desfoque
    --------------------------------------------------- */
 .glass-panel {

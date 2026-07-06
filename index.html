@@ -29,10 +29,13 @@
 
     <link rel="stylesheet" href="style.css">
 </head>
-<body class="flex flex-col items-center justify-center min-h-screen py-10 px-4 sm:px-6 lg:px-8 selection:bg-sky-500/30 selection:text-sky-200 relative">
+<body class="flex flex-col items-center justify-center min-h-screen py-10 px-4 sm:px-6 lg:px-8 selection:bg-sky-500/30 selection:text-sky-200 relative bio-loading">
 
     <!-- Canvas para Partículas e Estrelas -->
     <canvas id="bg-canvas"></canvas>
+
+    <!-- Loader: visível até o conteúdo real chegar (evita flash de conteúdo antigo) -->
+    <div class="bio-loader" aria-hidden="true"><div class="spinner"></div></div>
 
     <main class="w-full max-w-lg mx-auto z-10 flex flex-col items-center flex-grow justify-center relative">
         
@@ -122,6 +125,9 @@
             </a>
         </div>
     </footer>
+
+    <!-- Rede de segurança: revela a página mesmo se o carregamento falhar/demorar demais -->
+    <script>setTimeout(function(){ document.body.classList.remove('bio-loading'); }, 8000);</script>
 
     <script src="script.js"></script>
     <script type="module" src="data-loader.js"></script>
